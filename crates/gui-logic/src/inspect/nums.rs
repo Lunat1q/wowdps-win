@@ -256,7 +256,7 @@ mod tests {
         let labels = |m: &Mitigation, taken| -> Vec<String> {
             mit_pieces(m, taken).into_iter().map(|p| p.0).collect()
         };
-        assert!(!labels(&m, 40_000).contains(&"Reduced".to_string()));
+        assert!(!labels(&m, 40_000).iter().any(|i| i == "Reduced"));
         // R17 amendment: 30 000 reduced joins `mitigated` and the swung
         // total alike — (10 000 + 30 000) of (40 000 + 30 000) is 57 %.
         m.reduced = 30_000;

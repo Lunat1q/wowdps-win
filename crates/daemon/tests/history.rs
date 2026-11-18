@@ -2861,7 +2861,7 @@ fn a_seeded_mem_backend_reads_through_and_never_writes() {
     b.write("fights", &card, b"{}").unwrap();
     assert_eq!(b.read("fights", &card).as_deref(), Some(&b"{}"[..]));
     b.write("rows", "new.json", b"[]").unwrap();
-    assert!(b.list("rows").contains(&"new.json".to_string()));
+    assert!(b.list("rows").iter().any(|i| i == "new.json"));
     assert_eq!(b.len(), 2, "only the writes are in memory");
     assert_eq!(tree(&root), before, "the disk never moved");
 }
