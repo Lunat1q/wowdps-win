@@ -78,7 +78,11 @@ fn the_items_are_the_rail_the_players_the_views_and_the_screens() {
     );
     // Realms shown when the option says so.
     let shown = items_with_realms();
-    assert!(titles(&shown, Group::Players).contains(&"Merrow-Nebula-US".to_string()));
+    assert!(
+        titles(&shown, Group::Players)
+            .iter()
+            .any(|i| i == "Merrow-Nebula-US")
+    );
 }
 
 fn items_with_realms() -> Vec<Item> {
