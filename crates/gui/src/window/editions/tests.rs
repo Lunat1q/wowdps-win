@@ -252,7 +252,7 @@ fn a_forever_meter_writes_both_names(cx: &mut TestAppContext) {
         })
     };
     assert!(
-        labels(cx).contains(&RETAIL_ME.to_string()),
+        labels(cx).iter().any(|i| i == RETAIL_ME),
         "{:?}",
         labels(cx)
     );
@@ -263,7 +263,7 @@ fn a_forever_meter_writes_both_names(cx: &mut TestAppContext) {
         "Tharokk Ironvale-Nebula-US",
         "Velkris Duskmantle-Nebula-US",
     ] {
-        assert!(shown.contains(&name.to_string()), "{shown:?}");
+        assert!(shown.iter().any(|i| i == name), "{shown:?}");
     }
     rig.gui.update(cx, |g, _| g.cfg.hide_realms = true);
     let hidden = labels(cx);
@@ -272,9 +272,9 @@ fn a_forever_meter_writes_both_names(cx: &mut TestAppContext) {
         "Tharokk Ironvale",
         "Velkris Duskmantle",
     ] {
-        assert!(hidden.contains(&name.to_string()), "{hidden:?}");
+        assert!(hidden.iter().any(|i| i == name), "{hidden:?}");
     }
-    assert!(!hidden.contains(&"Tharokk".to_string()), "{hidden:?}");
+    assert!(!hidden.iter().any(|i| i == "Tharokk"), "{hidden:?}");
 }
 
 /// Where the bar has room the games sit side by side, a chip each, every
