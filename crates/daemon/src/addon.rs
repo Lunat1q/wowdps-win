@@ -195,6 +195,12 @@ pub fn saved_variables(product: &Path) -> Vec<(String, PathBuf)> {
     out
 }
 
+/// The display label for a zero-based position in [`saved_variables`]'s
+/// sorted list. Folder names remain data, never status or error labels.
+pub fn saved_variables_label(position: usize) -> String {
+    format!("account {}", position + 1)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

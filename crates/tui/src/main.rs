@@ -498,7 +498,8 @@ fn do_addon(install: bool) -> i32 {
     if files.is_empty() {
         println!("saved:   no account has written WOWDPS_DATA yet (it lands on logout)");
     }
-    for (account, path) in files {
+    for (position, (account, path)) in files.into_iter().enumerate() {
+        let label = addon::saved_variables_label(position);
         let seen = std::fs::metadata(&path)
             .and_then(|m| m.modified())
             .ok()
@@ -519,7 +520,7 @@ fn do_addon(install: bool) -> i32 {
                     format!("{players} players, {creatures} creatures")
                 },
             );
-        println!("saved:   {account}: {records}, written {seen}");
+        println!("saved:   {label}: {records}, written {seen}");
     }
     0
 }

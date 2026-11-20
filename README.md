@@ -227,6 +227,19 @@ in the product folder of the logs it is pointed at (`logs_dir`, else
 Retail's). With both games followed, the other game's fights get no guilds,
 no own-character mark from the addon and no creature classifications.
 
+`wowdps addon` (or `wowdps addon status`) reports each account's saved player
+and creature counts and write date. Accounts are numbered in account-folder
+sort order, including a single account, without printing their folder names:
+
+```text
+saved:   account 1: 12 players, 4 creatures, written 2026-11-18
+saved:   account 2: 3 players, 0 creatures, written 2026-11-02
+```
+
+SavedVariables read or parse errors in daemon status use the same `account N`
+in place of the account-folder component, keeping the rest of the path and
+the error description.
+
 ### Game data caches
 
 Class crests, spec icons and spell icons come from your own game install,

@@ -725,7 +725,8 @@ impl<B: Backend> Worker<B> {
         };
         let mut merged = 0usize;
         let mut seen: Vec<Creature> = Vec::new();
-        for (account, path) in addon::saved_variables(&product) {
+        for (position, (account, path)) in addon::saved_variables(&product).into_iter().enumerate()
+        {
             let Ok(modified) = std::fs::metadata(&path).and_then(|m| m.modified()) else {
                 continue;
             };
@@ -735,10 +736,17 @@ impl<B: Backend> Worker<B> {
             // Remember the time even when the read fails: a torn file is
             // reread when it changes again, not thirty times a night.
             self.saved_variables.insert(path.clone(), modified);
+            // Replace only the account component in published diagnostics;
+            // the real folder name still identifies affiliation records.
+            let display_path = product
+                .join("WTF/Account")
+                .join(addon::saved_variables_label(position))
+                .join("SavedVariables")
+                .join(format!("{}.lua", addon::NAME));
             let text = match std::fs::read_to_string(&path) {
                 Ok(t) => t,
                 Err(e) => {
-                    self.store.last_error = Some(format!("{}: {e}", path.display()));
+                    self.store.last_error = Some(format!("{}: {e}", display_path.display()));
                     continue;
                 }
             };
@@ -751,7 +759,7 @@ impl<B: Backend> Worker<B> {
                 }
                 Ok(None) => {}
                 Err(e) => {
-                    self.store.last_error = Some(format!("{}: {e}", path.display()));
+                    self.store.last_error = Some(format!("{}: {e}", display_path.display()));
                 }
             }
         }

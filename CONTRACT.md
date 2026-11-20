@@ -1529,7 +1529,14 @@ one), validated as an install — with `## Interface:` from `.build.info`'s Vers
 (`12.1.0.69587` → `120100`) and `## Version:` the daemon's; the daemon's history thread, on
 start, REWRITES a copy that is not byte-for-byte what it would write (older version, moved
 interface number, hand edit) and LEAVES a missing one missing — installing is the user's
-call, once. `wowdps addon` reports both, plus each account's SavedVariables. (v49) The addon
+call, once. `wowdps addon` reports both, plus each account's SavedVariables, labeled
+`account 1`, `account 2`, … in the existing account-folder sort order, including when
+there is only one account. `daemon::addon::saved_variables_label(position: usize) -> String`
+defines that label from the zero-based position in `addon::saved_variables`.
+SavedVariables read and parse errors replace only the account-folder component of
+the displayed path with the same label before publishing history status; the rest
+of the path and the error description remain. Folder names still identify files
+and affiliation records as data. (v49) The addon
 is the first source's product's alone: the daemon checks, rewrites and reads that one copy, so
 an edition followed beside it (an install's Forever beside Retail) has its copy never kept
 current and its `WOWDPS_DATA` never read — its cards get no guild, no own-character mark from
@@ -1582,7 +1589,8 @@ the editions whose game runs; under an edition whose newest stored fight is know
 one `Fights` question per edition, `history::newest_build_query`), `wowdps stop`,
 `wowdps addon [status | install]` (v31: the wowdps addon in the game's AddOns folder —
 `status` needs no daemon and reports install / interface / state / each account's
-SavedVariables, its players and creatures counted; `install` writes it),
+SavedVariables, its players and creatures counted under `account N` labels;
+`install` writes it),
 `wowdps help`. Any other first word dispatches externally: `wowdps <cmd> [args…]`
 execs `wowdps-<cmd>` with the tail verbatim, preferring a sibling of the running
 binary (same build) over `$PATH` — `wowdps extract …` runs `wowdps-extract`,
