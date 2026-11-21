@@ -3,10 +3,15 @@
 //!
 //! Existing per-test guards can keep removing their children early. The
 //! process root also covers setup panics and paths held in process-wide state.
+//! Writer tests use `process::isolate`: a parent owns their root until all
+//! child threads have ended; exit cleanup alone cannot synchronize writers.
 //! Normal exits, including libtest failures, run the C runtime's exit hook;
 //! aborts and signals that kill the process cannot run cleanup.
 
 #![allow(dead_code, clippy::panic)]
+
+#[path = "process.rs"]
+pub mod process;
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -85,12 +90,18 @@ fn process_dir(slot: &'static OnceLock<Dir>, base: PathBuf) -> PathBuf {
 
 /// Parent for test scratch paths; removed at normal process exit.
 pub fn root() -> PathBuf {
+    if let Some(root) = process::borrowed_root() {
+        return root;
+    }
     process_dir(&ROOT, std::env::temp_dir())
 }
 
 /// Preserve the fake compositor's short Unix socket paths even when the
 /// system's temporary directory (notably on macOS) has a long name.
 pub fn short_root() -> PathBuf {
+    if let Some(root) = process::borrowed_root() {
+        return root;
+    }
     #[cfg(unix)]
     {
         let base = std::env::temp_dir();
@@ -99,4 +110,23 @@ pub fn short_root() -> PathBuf {
         }
     }
     root()
+}
+
+/// A short parent without allocating a process root. The per-test process
+/// owner must avoid adding another process-root component to socket paths.
+fn short_parent() -> PathBuf {
+    let base = std::env::temp_dir();
+    #[cfg(unix)]
+    if base.as_os_str().len() > 40 {
+        return PathBuf::from("/tmp");
+    }
+    base
+}
+
+/// In an isolated writer process, its parent removes the entire root only
+/// after wait has established that every writer thread has ended.
+pub fn remove_when_quiet(path: &Path) {
+    if !process::in_child() {
+        let _ = std::fs::remove_dir_all(path);
+    }
 }

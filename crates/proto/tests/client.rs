@@ -334,6 +334,9 @@ fn reconnecting_is_refused_without_a_daemon_binary() {
 /// re-declares its cursor unprompted.
 #[test]
 fn spawning_reconnecting_and_squatted_dirs() {
+    if crate::test_scratch::process::isolate("spawning_reconnecting_and_squatted_dirs") {
+        return;
+    }
     let tmp = crate::test_scratch::short_root()
         .join(format!("wowdps-client-test-{}", std::process::id()));
     std::fs::create_dir_all(&tmp).expect("temp dir");
@@ -509,7 +512,7 @@ fn spawning_reconnecting_and_squatted_dirs() {
     // Alive: the tick is a no-op that reports Connected.
     assert!(matches!(client.try_reconnect(), Reconnect::Connected));
 
-    let _ = std::fs::remove_dir_all(&tmp);
+    crate::test_scratch::remove_when_quiet(&tmp);
 }
 
 /// A client served over a bare stream cannot respawn anything; the

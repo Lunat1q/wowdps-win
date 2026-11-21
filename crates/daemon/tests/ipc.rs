@@ -44,7 +44,7 @@ impl Temp {
 
 impl Drop for Temp {
     fn drop(&mut self) {
-        let _ = std::fs::remove_dir_all(&self.0);
+        crate::test_scratch::remove_when_quiet(&self.0);
     }
 }
 
@@ -260,6 +260,9 @@ fn fixture_lines() -> Vec<String> {
 
 #[test]
 fn handshake_acks_with_the_daemon_version() {
+    if crate::test_scratch::process::isolate("handshake_acks_with_the_daemon_version") {
+        return;
+    }
     let tmp = Temp::new("hello");
     let d = start(options(&tmp, SourceSpec::File(PathBuf::from(FIXTURE))));
     let mut c = Client::connect(&d.socket);
@@ -277,6 +280,11 @@ fn handshake_acks_with_the_daemon_version() {
 
 #[test]
 fn watching_live_serves_rows_identical_to_a_direct_replay() {
+    if crate::test_scratch::process::isolate(
+        "watching_live_serves_rows_identical_to_a_direct_replay",
+    ) {
+        return;
+    }
     let tmp = Temp::new("live-parity");
     let d = start(options(&tmp, SourceSpec::File(PathBuf::from(FIXTURE))));
     let mut c = Client::hello(&d.socket);
@@ -317,6 +325,9 @@ fn watching_live_serves_rows_identical_to_a_direct_replay() {
 
 #[test]
 fn a_drilled_cursor_carries_the_breakdown() {
+    if crate::test_scratch::process::isolate("a_drilled_cursor_carries_the_breakdown") {
+        return;
+    }
     let tmp = Temp::new("drill");
     let d = start(options(&tmp, SourceSpec::File(PathBuf::from(FIXTURE))));
     let mut c = Client::hello(&d.socket);
@@ -343,6 +354,11 @@ fn a_drilled_cursor_carries_the_breakdown() {
 
 #[test]
 fn the_list_cursor_serves_the_fixtures_segments_with_stable_ids() {
+    if crate::test_scratch::process::isolate(
+        "the_list_cursor_serves_the_fixtures_segments_with_stable_ids",
+    ) {
+        return;
+    }
     let tmp = Temp::new("list");
     let d = start(options(&tmp, SourceSpec::File(PathBuf::from(FIXTURE))));
     let mut c = Client::hello(&d.socket);
@@ -395,6 +411,11 @@ fn the_list_cursor_serves_the_fixtures_segments_with_stable_ids() {
 
 #[test]
 fn live_appends_reach_watchers_with_monotonic_seq_and_fresh_breakdowns() {
+    if crate::test_scratch::process::isolate(
+        "live_appends_reach_watchers_with_monotonic_seq_and_fresh_breakdowns",
+    ) {
+        return;
+    }
     let tmp = Temp::new("append");
     let log = tmp.join("WoWCombatLog.txt");
     append(&log, &hit(0, 0));
@@ -451,6 +472,11 @@ fn live_appends_reach_watchers_with_monotonic_seq_and_fresh_breakdowns() {
 
 #[test]
 fn a_new_pull_emits_segment_opened_once_and_pulls_the_list_forward() {
+    if crate::test_scratch::process::isolate(
+        "a_new_pull_emits_segment_opened_once_and_pulls_the_list_forward",
+    ) {
+        return;
+    }
     let tmp = Temp::new("opened");
     let log = tmp.join("WoWCombatLog.txt");
     append(&log, &hit(0, 0));
@@ -503,6 +529,9 @@ fn a_new_pull_emits_segment_opened_once_and_pulls_the_list_forward() {
 
 #[test]
 fn rotation_retires_old_ids_rather_than_reusing_them() {
+    if crate::test_scratch::process::isolate("rotation_retires_old_ids_rather_than_reusing_them") {
+        return;
+    }
     let tmp = Temp::new("rotate");
     let logs = Temp::new("rotate-logs");
     let old = logs.join("WoWCombatLog-01.txt");
@@ -556,6 +585,11 @@ fn rotation_retires_old_ids_rather_than_reusing_them() {
 
 #[test]
 fn two_clients_on_different_cursors_each_get_only_their_own_feed() {
+    if crate::test_scratch::process::isolate(
+        "two_clients_on_different_cursors_each_get_only_their_own_feed",
+    ) {
+        return;
+    }
     let tmp = Temp::new("two");
     let log = tmp.join("WoWCombatLog.txt");
     append(&log, &hit(0, 0));
@@ -602,6 +636,9 @@ fn two_clients_on_different_cursors_each_get_only_their_own_feed() {
 
 #[test]
 fn shutdown_works_even_before_a_handshake() {
+    if crate::test_scratch::process::isolate("shutdown_works_even_before_a_handshake") {
+        return;
+    }
     let tmp = Temp::new("shutdown");
     let d = start(options(&tmp, SourceSpec::File(PathBuf::from(FIXTURE))));
     let mut c = Client::connect(&d.socket);
@@ -613,6 +650,9 @@ fn shutdown_works_even_before_a_handshake() {
 
 #[test]
 fn only_watching_sessions_hold_the_daemon_open() {
+    if crate::test_scratch::process::isolate("only_watching_sessions_hold_the_daemon_open") {
+        return;
+    }
     let tmp = Temp::new("idle");
     let mut opts = options(&tmp, SourceSpec::File(PathBuf::from(FIXTURE)));
     opts.linger = false;
@@ -640,6 +680,10 @@ fn only_watching_sessions_hold_the_daemon_open() {
 
 #[test]
 fn the_lockfile_lets_exactly_one_daemon_own_the_socket() {
+    if crate::test_scratch::process::isolate("the_lockfile_lets_exactly_one_daemon_own_the_socket")
+    {
+        return;
+    }
     let tmp = Temp::new("lock");
     let opts_a = options(&tmp, SourceSpec::File(PathBuf::from(FIXTURE)));
     let opts_b = options(&tmp, SourceSpec::File(PathBuf::from(FIXTURE)));
@@ -655,6 +699,9 @@ fn the_lockfile_lets_exactly_one_daemon_own_the_socket() {
 
 #[test]
 fn a_stale_socket_file_is_recovered_not_fatal() {
+    if crate::test_scratch::process::isolate("a_stale_socket_file_is_recovered_not_fatal") {
+        return;
+    }
     let tmp = Temp::new("stale");
     let opts = options(&tmp, SourceSpec::File(PathBuf::from(FIXTURE)));
     // A dead daemon's leftover: bound once, never cleaned up.
@@ -667,6 +714,9 @@ fn a_stale_socket_file_is_recovered_not_fatal() {
 
 #[test]
 fn an_overlay_session_is_supervised_over_the_wire() {
+    if crate::test_scratch::process::isolate("an_overlay_session_is_supervised_over_the_wire") {
+        return;
+    }
     let tmp = Temp::new("overlay");
     let d = start(options(&tmp, SourceSpec::File(PathBuf::from(FIXTURE))));
 
@@ -711,6 +761,10 @@ fn an_overlay_session_is_supervised_over_the_wire() {
 #[test]
 #[ignore = "needs WOWDPS_REAL_LOG pointing at a real combat log"]
 fn real_log_first_snapshot_is_fast_cold_and_faster_warm() {
+    if crate::test_scratch::process::isolate("real_log_first_snapshot_is_fast_cold_and_faster_warm")
+    {
+        return;
+    }
     let Some(path) = real_log::retail_log() else {
         return;
     };
@@ -751,6 +805,9 @@ fn real_log_first_snapshot_is_fast_cold_and_faster_warm() {
 #[test]
 #[ignore = "a timing measurement: run it alone, in release"]
 fn an_idle_edition_costs_close_to_nothing() {
+    if crate::test_scratch::process::isolate("an_idle_edition_costs_close_to_nothing") {
+        return;
+    }
     use std::collections::HashMap;
     use wowdps_model::Edition;
     /// Each thread of this process and the nanoseconds it has run.
@@ -862,6 +919,11 @@ fn an_idle_edition_costs_close_to_nothing() {
 /// the other log shows a newer line and the last move's hold is over.
 #[test]
 fn a_daemon_follows_one_source_per_edition_and_moves_its_followers() {
+    if crate::test_scratch::process::isolate(
+        "a_daemon_follows_one_source_per_edition_and_moves_its_followers",
+    ) {
+        return;
+    }
     use wowdps_model::Edition;
     use wowdps_proto::EditionRef;
     let tmp = Temp::new("editions");

@@ -121,6 +121,36 @@ fn child_process() {
     let Ok(mode) = std::env::var("WOWDPS_SCRATCH_CHILD") else {
         return;
     };
+    if mode == "pending-writer" {
+        unsafe extern "C" {
+            fn atexit(callback: extern "C" fn()) -> std::ffi::c_int;
+        }
+        // SAFETY: this callback uses only process-lifetime state and joins its
+        // worker. Register first, so ordinary scratch cleanup runs before it.
+        assert_eq!(unsafe { atexit(finish_pending_writer) }, 0);
+        let root = test_scratch::root();
+        let (start, ready) = std::sync::mpsc::channel();
+        let path = root.clone();
+        let worker = std::thread::spawn(move || {
+            ready.recv().unwrap();
+            if !path.is_dir() {
+                use std::io::Write as _;
+                writeln!(std::io::stdout(), "pending-root-removed-too-early")?;
+            }
+            std::fs::create_dir_all(&path)?;
+            std::fs::write(path.join("pending-write"), b"late write")
+        });
+        assert!(
+            PENDING_WRITER
+                .set(PendingWriter {
+                    start,
+                    worker: std::sync::Mutex::new(Some(worker))
+                })
+                .is_ok()
+        );
+        println!("scratch-root={}", root.display());
+        panic!("test failed with a pending filesystem write");
+    }
     if mode.starts_with("collision-") {
         let parent = std::path::PathBuf::from(std::env::var_os("WOWDPS_COLLISION_PARENT").unwrap());
         // This re-exec has not allocated anything: its NEXT value is zero.
@@ -193,4 +223,62 @@ fn subprocess_temp_override_covers_each_platform_variable() {
 #[test]
 fn non_unix_short_root_uses_the_platform_temp_parent() {
     assert_eq!(test_scratch::short_root(), test_scratch::root());
+}
+
+struct PendingWriter {
+    start: std::sync::mpsc::Sender<()>,
+    worker: std::sync::Mutex<Option<std::thread::JoinHandle<std::io::Result<()>>>>,
+}
+static PENDING_WRITER: std::sync::OnceLock<PendingWriter> = std::sync::OnceLock::new();
+
+extern "C" fn finish_pending_writer() {
+    use std::io::Write as _;
+    if let Some(writer) = PENDING_WRITER.get() {
+        let _ = writer.start.send(());
+        if let Ok(mut slot) = writer.worker.lock()
+            && let Some(worker) = slot.take()
+            && matches!(worker.join(), Ok(Ok(())))
+        {
+            let _ = writeln!(std::io::stdout(), "pending-writer-finished");
+        }
+    }
+}
+
+#[test]
+fn a_failed_writer_process_finishes_before_its_scratch_is_removed() {
+    let result = test_scratch::process::run_test("scratch_tests::child_process", |command| {
+        command.env("WOWDPS_SCRATCH_CHILD", "pending-writer");
+    });
+    let output = result.output;
+    assert_eq!(
+        output.status.code(),
+        Some(101),
+        "normal failed libtest exit"
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("pending-writer-finished"), "{output:?}");
+    assert!(
+        !stdout.contains("pending-root-removed-too-early"),
+        "root must remain until writers finish"
+    );
+    let root = stdout
+        .lines()
+        .find_map(|l| l.strip_prefix("scratch-root="))
+        .unwrap();
+    assert_eq!(std::path::Path::new(root), result.root);
+    assert!(
+        !std::path::Path::new(root).exists(),
+        "late writer recreated {root}"
+    );
+}
+
+#[test]
+fn an_owned_case_cannot_succeed_without_entering_its_body() {
+    let result = std::panic::catch_unwind(|| {
+        test_scratch::process::isolate("scratch_tests::missing_owned_case");
+    });
+    assert!(
+        result.is_err(),
+        "a zero-test child is not a successful test"
+    );
 }

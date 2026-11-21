@@ -41,7 +41,7 @@ impl Temp {
 
 impl Drop for Temp {
     fn drop(&mut self) {
-        let _ = std::fs::remove_dir_all(&self.0);
+        crate::test_scratch::remove_when_quiet(&self.0);
     }
 }
 
@@ -174,6 +174,9 @@ fn num_of(v: &Json, key: &str) -> f64 {
 
 #[test]
 fn the_whole_surface_over_a_real_daemon() {
+    if crate::test_scratch::process::isolate("the_whole_surface_over_a_real_daemon") {
+        return;
+    }
     let tmp = Temp::new("surface");
     let socket = start_daemon(&tmp);
     let stream = UnixStream::connect(&socket).expect("connect");
@@ -538,6 +541,9 @@ fn the_whole_surface_over_a_real_daemon() {
 /// through the full rpc surface.
 #[test]
 fn talent_tools_over_a_fixture_dataset() {
+    if crate::test_scratch::process::isolate("talent_tools_over_a_fixture_dataset") {
+        return;
+    }
     let tmp = Temp::new("talents");
     let dataset = tmp.0.join("talents.json");
     assert!(
@@ -834,6 +840,9 @@ fn talent_tools_over_a_fixture_dataset() {
 #[test]
 #[ignore = "needs WOWDPS_REAL_TALENT_STRING holding a real in-game export"]
 fn real_talent_string_round_trips_byte_identically() {
+    if crate::test_scratch::process::isolate("real_talent_string_round_trips_byte_identically") {
+        return;
+    }
     use wowdps_mcp::talents;
 
     let string = std::env::var("WOWDPS_REAL_TALENT_STRING").expect("set WOWDPS_REAL_TALENT_STRING");
@@ -887,6 +896,9 @@ fn real_talent_string_round_trips_byte_identically() {
 
 #[test]
 fn status_answers_without_a_cursor() {
+    if crate::test_scratch::process::isolate("status_answers_without_a_cursor") {
+        return;
+    }
     let tmp = Temp::new("status");
     let socket = start_daemon(&tmp);
     let stream = UnixStream::connect(&socket).expect("connect");
@@ -949,6 +961,9 @@ fn error_text(reply: &Json) -> &str {
 /// daemon at all.
 #[test]
 fn load_failures_and_bad_arguments_are_tool_errors() {
+    if crate::test_scratch::process::isolate("load_failures_and_bad_arguments_are_tool_errors") {
+        return;
+    }
     let tmp = Temp::new("errors");
     let socket = start_daemon(&tmp);
     let stream = UnixStream::connect(&socket).expect("connect");
@@ -983,6 +998,9 @@ fn load_failures_and_bad_arguments_are_tool_errors() {
 /// visit ordinal, and the Overall's fight header names the visit too.
 #[test]
 fn keystone_visits_list_their_par_timers() {
+    if crate::test_scratch::process::isolate("keystone_visits_list_their_par_timers") {
+        return;
+    }
     let tmp = Temp::new("keystone");
     let socket = start_daemon_on(&tmp, INSTANCE);
     let stream = UnixStream::connect(&socket).expect("connect");
@@ -1028,6 +1046,11 @@ fn keystone_visits_list_their_par_timers() {
 /// logged, and the bridge's own argument check.
 #[test]
 fn death_recaps_unlogged_builds_and_bridge_argument_checks() {
+    if crate::test_scratch::process::isolate(
+        "death_recaps_unlogged_builds_and_bridge_argument_checks",
+    ) {
+        return;
+    }
     let tmp = Temp::new("recap");
     let socket = start_daemon(&tmp);
     let stream = UnixStream::connect(&socket).expect("connect");
@@ -1116,6 +1139,9 @@ fn death_recaps_unlogged_builds_and_bridge_argument_checks() {
 /// the failure — and a daemon that goes away mid-session is a tool error.
 #[test]
 fn status_words_the_overlay_and_a_lost_daemon() {
+    if crate::test_scratch::process::isolate("status_words_the_overlay_and_a_lost_daemon") {
+        return;
+    }
     use wowdps_proto::{ClientKind, ClientMsg, DaemonClient};
 
     let tmp = Temp::new("overlay");
@@ -1255,6 +1281,9 @@ fn wait_for_store(bridge: &mut Bridge, fights: u64) {
 
 #[test]
 fn history_tools_answer_over_the_store() {
+    if crate::test_scratch::process::isolate("history_tools_answer_over_the_store") {
+        return;
+    }
     let tmp = Temp::new("history");
     let opts = history_opts(&tmp);
     let socket = start_daemon_with(&tmp, FIXTURE, |o| o.history = Some(opts));
@@ -1606,6 +1635,9 @@ fn history_tools_answer_over_the_store() {
 
 #[test]
 fn history_tools_answer_empty_without_a_store() {
+    if crate::test_scratch::process::isolate("history_tools_answer_empty_without_a_store") {
+        return;
+    }
     let tmp = Temp::new("nohistory");
     let socket = start_daemon(&tmp);
     let mut bridge = Bridge::over(UnixStream::connect(&socket).expect("connect")).expect("bridge");
@@ -1652,6 +1684,9 @@ fn history_tools_answer_empty_without_a_store() {
 /// keeps and that there is no breakdown.
 #[test]
 fn an_imported_fight_answers_its_card_meter() {
+    if crate::test_scratch::process::isolate("an_imported_fight_answers_its_card_meter") {
+        return;
+    }
     use wowdps_proto::history::{ImportedCard, ImportedPlayer, imported_id};
     use wowdps_proto::{ClientKind, ClientMsg, DaemonClient, DaemonMsg, HistoryAnswer};
 
@@ -1782,6 +1817,10 @@ fn an_imported_fight_answers_its_card_meter() {
 /// key's member bosses by id is an error that names the key to pin instead.
 #[test]
 fn key_cards_word_par_and_member_boss_pins_name_the_key() {
+    if crate::test_scratch::process::isolate("key_cards_word_par_and_member_boss_pins_name_the_key")
+    {
+        return;
+    }
     let tmp = Temp::new("keypin");
     let opts = history_opts(&tmp);
     let socket = start_daemon_with(&tmp, INSTANCE, |o| o.history = Some(opts));
@@ -1881,6 +1920,9 @@ fn f64_of(row: &Json, key: &str) -> f64 {
 
 #[test]
 fn healer_owner_is_ranked_among_healers_by_hps() {
+    if crate::test_scratch::process::isolate("healer_owner_is_ranked_among_healers_by_hps") {
+        return;
+    }
     // Mírelle (Discipline) is the fixture's only healer: the trivial
     // one-healer case, asserted explicitly — rank 1 of 1, the median is her
     // own HPS, and (nobody else heals on the kill) her share is all of it.
@@ -1908,6 +1950,9 @@ fn healer_owner_is_ranked_among_healers_by_hps() {
 
 #[test]
 fn dps_owner_generic_block_equals_the_legacy_block() {
+    if crate::test_scratch::process::isolate("dps_owner_generic_block_equals_the_legacy_block") {
+        return;
+    }
     // Thraxx (Arms) is DPS-role: the role-relative block IS the old DPS
     // block, key for key, and every legacy key is populated.
     let me = me_of_owner("owner-dps", "Thraxx");
@@ -1970,6 +2015,9 @@ fn taken_daemon(tag: &str, owner: Option<&str>) -> (Temp, Bridge) {
 /// from the log by `check.awk`.
 #[test]
 fn the_taken_view_reads_the_tank_side_live_and_stored() {
+    if crate::test_scratch::process::isolate("the_taken_view_reads_the_tank_side_live_and_stored") {
+        return;
+    }
     let (_tmp, mut bridge) = taken_daemon("taken-view", None);
 
     let reply = drive(&mut bridge, &[&call_line(1, "list_fights", "{}")]);
@@ -2100,6 +2148,11 @@ fn the_taken_view_reads_the_tank_side_live_and_stored() {
 /// shapes that are not the warrior's block.
 #[test]
 fn stagger_and_full_absorbs_show_up_in_the_mitigation_object() {
+    if crate::test_scratch::process::isolate(
+        "stagger_and_full_absorbs_show_up_in_the_mitigation_object",
+    ) {
+        return;
+    }
     let (_tmp, mut bridge) = taken_daemon("taken-shapes", None);
     // The live fight is the trailing Trash stretch; the encounter is named.
     let reply = drive(&mut bridge, &[&call_line(1, "list_fights", "{}")]);
@@ -2175,6 +2228,11 @@ fn taken_me(tag: &str, name: &str) -> Json {
 
 #[test]
 fn a_tank_owner_reads_the_card_measures_and_the_tank_pair() {
+    if crate::test_scratch::process::isolate(
+        "a_tank_owner_reads_the_card_measures_and_the_tank_pair",
+    ) {
+        return;
+    }
     // Durgan is Protection Warrior: unranked, but with his own numbers and
     // the co-tank beside him, heaviest first.
     let me = taken_me("taken-owner-tank", "Durgan");
@@ -2201,6 +2259,10 @@ fn a_tank_owner_reads_the_card_measures_and_the_tank_pair() {
 
 #[test]
 fn a_non_tank_owner_gets_the_measures_but_no_tank_pair() {
+    if crate::test_scratch::process::isolate("a_non_tank_owner_gets_the_measures_but_no_tank_pair")
+    {
+        return;
+    }
     let me = taken_me("taken-owner-dps", "Pyralis");
     assert_eq!(str_of(&me, "role"), "dps");
     assert_eq!(
@@ -2215,6 +2277,9 @@ fn a_non_tank_owner_gets_the_measures_but_no_tank_pair() {
 
 #[test]
 fn trend_takes_a_measure_and_defaults_it_by_role() {
+    if crate::test_scratch::process::isolate("trend_takes_a_measure_and_defaults_it_by_role") {
+        return;
+    }
     let (_tmp, mut bridge) = taken_daemon("taken-trend", None);
     let one = |doc: &Json, key: &str| -> f64 {
         match doc.get("points") {
@@ -2257,6 +2322,9 @@ fn trend_takes_a_measure_and_defaults_it_by_role() {
 
 #[test]
 fn history_filters_fights_by_the_subjects_role() {
+    if crate::test_scratch::process::isolate("history_filters_fights_by_the_subjects_role") {
+        return;
+    }
     let (_tmp, mut bridge) = taken_daemon("taken-role", Some("Durgan"));
     let reply = drive(
         &mut bridge,
@@ -2293,6 +2361,11 @@ fn history_filters_fights_by_the_subjects_role() {
 /// skips the role filter, and the answer says so instead of pretending.
 #[test]
 fn history_role_without_a_subject_is_reported_not_applied() {
+    if crate::test_scratch::process::isolate(
+        "history_role_without_a_subject_is_reported_not_applied",
+    ) {
+        return;
+    }
     let (_tmp, mut bridge) = taken_daemon("taken-role-nosubject", None);
     let reply = drive(
         &mut bridge,
@@ -2367,6 +2440,11 @@ fn u64_of(row: &Json, key: &str) -> u64 {
 
 #[test]
 fn an_augmentation_owner_is_graded_by_effective_dps_and_flagged_support() {
+    if crate::test_scratch::process::isolate(
+        "an_augmentation_owner_is_graded_by_effective_dps_and_flagged_support",
+    ) {
+        return;
+    }
     // Vessyra (Augmentation): 69 500 raw damage, 23 900 given, 7 500 received
     // (the self-supported Bombardments proc, once) → 85 900 effective over
     // 60 s. Both grades rank her last of the three DPS — 85 900 against the
@@ -2404,6 +2482,11 @@ fn an_augmentation_owner_is_graded_by_effective_dps_and_flagged_support() {
 
 #[test]
 fn a_buffed_mage_owner_ranks_first_on_effective_dps_below_its_raw_dps() {
+    if crate::test_scratch::process::isolate(
+        "a_buffed_mage_owner_ranks_first_on_effective_dps_below_its_raw_dps",
+    ) {
+        return;
+    }
     // Ignatia (Fire): 271 000 raw with 1 650 of it an Augmentation's shares
     // (the Water Elemental's 90 included) → 269 350 effective; first either
     // way, and not a support spec.
@@ -2426,6 +2509,11 @@ fn a_buffed_mage_owner_ranks_first_on_effective_dps_below_its_raw_dps() {
 
 #[test]
 fn a_healer_owner_reads_the_healing_split_and_the_self_healed_pair() {
+    if crate::test_scratch::process::isolate(
+        "a_healer_owner_reads_the_healing_split_and_the_self_healed_pair",
+    ) {
+        return;
+    }
     // Seraphíne (Holy Priest): 88 000 healing of which 15 000 absorbs and
     // 16 000 overhealing; both Renew ticks were on herself.
     let me = support_me("support-owner-priest", "Seraphíne");
@@ -2450,6 +2538,9 @@ fn a_healer_owner_reads_the_healing_split_and_the_self_healed_pair() {
 
 #[test]
 fn the_roster_and_a_peer_carry_the_support_scalars() {
+    if crate::test_scratch::process::isolate("the_roster_and_a_peer_carry_the_support_scalars") {
+        return;
+    }
     let (_tmp, mut bridge) = support_daemon("support-roster", Some("Vessyra"));
     let reply = drive(
         &mut bridge,
@@ -2509,6 +2600,9 @@ fn the_roster_and_a_peer_carry_the_support_scalars() {
 
 #[test]
 fn stored_fight_drills_a_supporters_targets() {
+    if crate::test_scratch::process::isolate("stored_fight_drills_a_supporters_targets") {
+        return;
+    }
     let (_tmp, mut bridge) = support_daemon("support-stored", None);
     let reply = drive(&mut bridge, &[&call_line(2, "history", "{}")]);
     let id = str_of(&fights(&tool_doc(&reply[0]))[0], "id").to_string();
@@ -2603,6 +2697,11 @@ fn stored_fight_drills_a_supporters_targets() {
 
 #[test]
 fn trend_defaults_a_dps_player_to_effective_dps_and_keeps_raw_dps() {
+    if crate::test_scratch::process::isolate(
+        "trend_defaults_a_dps_player_to_effective_dps_and_keeps_raw_dps",
+    ) {
+        return;
+    }
     let (_tmp, mut bridge) = support_daemon("support-trend", None);
     let one = |doc: &Json, key: &str| -> f64 {
         match doc.get("points") {
@@ -2654,6 +2753,9 @@ fn trend_defaults_a_dps_player_to_effective_dps_and_keeps_raw_dps() {
 /// the caller a document; only a name that is in no view at all still errs.
 #[test]
 fn a_survivor_gets_an_empty_death_recap_not_an_error() {
+    if crate::test_scratch::process::isolate("a_survivor_gets_an_empty_death_recap_not_an_error") {
+        return;
+    }
     let tmp = Temp::new("survived");
     let socket = start_daemon(&tmp);
     let stream = UnixStream::connect(&socket).expect("connect");
@@ -2718,6 +2820,9 @@ fn a_survivor_gets_an_empty_death_recap_not_an_error() {
 /// it, never after.
 #[test]
 fn the_fight_tool_carries_the_raid_timeline() {
+    if crate::test_scratch::process::isolate("the_fight_tool_carries_the_raid_timeline") {
+        return;
+    }
     let tmp = Temp::new("raid");
     let socket = start_daemon(&tmp);
     let stream = UnixStream::connect(&socket).expect("connect");
@@ -2789,6 +2894,10 @@ fn the_fight_tool_carries_the_raid_timeline() {
 /// and on their deaths in the raid timeline.
 #[test]
 fn the_real_daemon_marks_the_configured_character_mine() {
+    if crate::test_scratch::process::isolate("the_real_daemon_marks_the_configured_character_mine")
+    {
+        return;
+    }
     let tmp = Temp::new("mine");
     let mut opts = history_opts(&tmp);
     opts.characters = vec!["Mírelle".to_string()];
@@ -2839,6 +2948,9 @@ const TREE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../core/fixtures/tree.t
 /// totals each group.
 #[test]
 fn a_drill_s_abilities_carry_the_ability_tree() {
+    if crate::test_scratch::process::isolate("a_drill_s_abilities_carry_the_ability_tree") {
+        return;
+    }
     let tmp = Temp::new("tree");
     let socket = start_daemon_on(&tmp, TREE);
     let stream = UnixStream::connect(&socket).expect("connect");
@@ -2935,6 +3047,9 @@ fn a_drill_s_abilities_carry_the_ability_tree() {
 /// heal-absorb ate of it.
 #[test]
 fn an_empowered_ability_carries_its_stages() {
+    if crate::test_scratch::process::isolate("an_empowered_ability_carries_its_stages") {
+        return;
+    }
     let tmp = Temp::new("empower");
     let socket = start_daemon_on(&tmp, TREE);
     let stream = UnixStream::connect(&socket).expect("connect");
@@ -3099,6 +3214,9 @@ fn doc_of(bridge: &mut Bridge, tool: &str, args: &str) -> Json {
 /// a Forever fight's loadout says its log carries no builds.
 #[test]
 fn the_live_tools_follow_or_pin_an_edition() {
+    if crate::test_scratch::process::isolate("the_live_tools_follow_or_pin_an_edition") {
+        return;
+    }
     let tmp = Temp::new("editions");
     let retail = std::fs::read_to_string(FIXTURE).expect("fixture");
     let forever = std::fs::read_to_string(FOREVER_FIXTURE).expect("forever fixture");
@@ -3459,6 +3577,11 @@ fn party_log(project_id: u8, hour: u32, players: &[(&str, &str)]) -> String {
 /// none of whose players is the account's is refused, naming each.
 #[test]
 fn stored_lookups_take_no_prefix_and_prefer_the_account_s_own() {
+    if crate::test_scratch::process::isolate(
+        "stored_lookups_take_no_prefix_and_prefer_the_account_s_own",
+    ) {
+        return;
+    }
     let tmp = Temp::new("hist-names");
     let forever = party_log(
         18,
@@ -3640,6 +3763,11 @@ fn stored_lookups_take_no_prefix_and_prefer_the_account_s_own() {
 /// full name) and says which label it took.
 #[test]
 fn a_live_lookup_takes_the_account_s_own_among_namesakes() {
+    if crate::test_scratch::process::isolate(
+        "a_live_lookup_takes_the_account_s_own_among_namesakes",
+    ) {
+        return;
+    }
     let tmp = Temp::new("live-names");
     let opts = wowdps_daemon::history::HistoryOptions {
         characters: vec!["Tharokk Ironvale".to_string()],
@@ -3698,6 +3826,9 @@ fn a_live_lookup_takes_the_account_s_own_among_namesakes() {
 /// one edition, and a name two editions share is an error naming both.
 #[test]
 fn the_history_tools_keep_editions_apart() {
+    if crate::test_scratch::process::isolate("the_history_tools_keep_editions_apart") {
+        return;
+    }
     let tmp = Temp::new("hist-editions");
     let retail = boss_log(
         1,
