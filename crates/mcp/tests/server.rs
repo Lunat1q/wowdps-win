@@ -840,9 +840,7 @@ fn talent_tools_over_a_fixture_dataset() {
 #[test]
 #[ignore = "needs WOWDPS_REAL_TALENT_STRING holding a real in-game export"]
 fn real_talent_string_round_trips_byte_identically() {
-    if crate::test_scratch::process::isolate("real_talent_string_round_trips_byte_identically") {
-        return;
-    }
+    // Read-only: retain the caller's configured default dataset path.
     use wowdps_mcp::talents;
 
     let string = std::env::var("WOWDPS_REAL_TALENT_STRING").expect("set WOWDPS_REAL_TALENT_STRING");
@@ -4015,3 +4013,34 @@ fn the_history_tools_keep_editions_apart() {
 
 #[path = "../../test-support/scratch.rs"]
 mod test_scratch;
+
+#[test]
+fn the_talent_round_trip_gate_reads_its_default_data_directory() {
+    let input = crate::test_scratch::Dir::new_in(&crate::test_scratch::root());
+    let data = input.path().join("data");
+    std::fs::create_dir_all(data.join("wowdps")).unwrap();
+    let text = r#"{"trees":[{"specs":[{"specId":62}],"nodeOrder":[],"nodes":[]}]}"#;
+    std::fs::write(data.join("wowdps/talents.json"), text).unwrap();
+    let dataset = json::parse(text).unwrap();
+    let encoded = wowdps_mcp::talents::encode(&dataset, 62, &[]).unwrap();
+    let string = encoded.get("string").and_then(Json::as_str).unwrap();
+    let output = std::process::Command::new(std::env::current_exe().unwrap())
+        .args([
+            "--exact",
+            "real_talent_string_round_trips_byte_identically",
+            "--ignored",
+            "--nocapture",
+        ])
+        .env("XDG_DATA_HOME", &data)
+        .env("WOWDPS_REAL_TALENT_STRING", string)
+        .env_remove("WOWDPS_TALENTS")
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(String::from_utf8_lossy(&output.stderr).contains("round-tripped"));
+}

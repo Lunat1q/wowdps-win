@@ -29,3 +29,9 @@ stays present through that last write and is removed only after process exit.
 
 A kill, abort, or hard timeout can bypass guards and exit callbacks. Existing
 candidate directories and symlinks are skipped, never swept or adopted.
+
+Before isolating a test, classify its inputs as well as its writers. A
+read-only gate using a caller-configured dataset does not need this boundary.
+For writer tests, preserve any external read-only input explicitly before
+redirecting HOME or the XDG directories; scratch outputs still belong to the
+owned process root.
