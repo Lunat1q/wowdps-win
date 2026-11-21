@@ -179,7 +179,7 @@ mod tests {
             e,
             "gen-role-signals: product wow has no committed table of its own; -o names the place"
         );
-        let elsewhere = std::env::temp_dir()
+        let elsewhere = crate::test_scratch::root()
             .join(format!("wowdps-extract-signals-{}", std::process::id()))
             .join("out.rs");
         let elsewhere = elsewhere.display().to_string();
@@ -201,7 +201,7 @@ mod tests {
     /// the cache its run after cuts would be Retail's.
     #[test]
     fn an_o_elsewhere_gets_through_and_the_later_o_wins() {
-        let elsewhere = std::env::temp_dir()
+        let elsewhere = crate::test_scratch::root()
             .join(format!("wowdps-extract-elsewhere-{}", std::process::id()))
             .join("out");
         let (elsewhere, mine) = (
@@ -239,7 +239,7 @@ mod tests {
     fn an_o_wins_over_the_checkout() {
         let checkout = committed("");
         let forever = committed("crates/core/src/forever/class_spells.rs");
-        let elsewhere = std::env::temp_dir()
+        let elsewhere = crate::test_scratch::root()
             .join(format!("wowdps-extract-checkout-{}", std::process::id()))
             .join("out");
         let elsewhere = elsewhere.display().to_string();
@@ -321,7 +321,7 @@ mod tests {
             assert!(e.starts_with(&head), "{name}: {e}");
             assert!(e.ends_with(REFUSED), "{name}: {e}");
         }
-        let scratch = std::env::temp_dir().join(format!(
+        let scratch = crate::test_scratch::root().join(format!(
             "wowdps-extract-twin-checkout-{}",
             std::process::id()
         ));
@@ -446,3 +446,7 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "../../../crates/test-support/scratch.rs"]
+mod test_scratch;

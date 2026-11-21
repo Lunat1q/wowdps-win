@@ -63,3 +63,7 @@ pub mod tact;
 pub mod talentgen;
 pub mod wdc5;
 pub mod wowhead;
+
+#[cfg(test)]
+#[path = "../../../crates/test-support/scratch.rs"]
+mod test_scratch;

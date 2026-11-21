@@ -200,7 +200,8 @@ pub(crate) mod tests {
 
     #[test]
     fn idx_and_archive_roundtrip() {
-        let dir = std::env::temp_dir().join(format!("wowdps-casc-test-{}", std::process::id()));
+        let dir =
+            crate::test_scratch::root().join(format!("wowdps-casc-test-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
 
         // One file: ekey with bucket B, stored in data.001 at offset 0x40.
@@ -284,7 +285,8 @@ pub(crate) mod tests {
         entries: &[([u8; 16], u64, u32)],
         tweak: impl Fn(u8, &mut Vec<u8>),
     ) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("wowdps-casc-{name}-{}", std::process::id()));
+        let dir =
+            crate::test_scratch::root().join(format!("wowdps-casc-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         for b in 0..16u8 {
