@@ -74,7 +74,7 @@ fn process_dir(slot: &'static OnceLock<Dir>, base: PathBuf) -> PathBuf {
         REGISTER.call_once(|| {
             // SAFETY: the callback has C ABI, never unwinds, and touches only
             // process-lifetime statics. atexit is provided by the C runtime on
-            // Linux and macOS, the platforms these tests build for.
+            // Linux, macOS, and Windows.
             assert_eq!(unsafe { atexit(cleanup) }, 0, "register scratch cleanup");
         });
         dir
@@ -91,10 +91,12 @@ pub fn root() -> PathBuf {
 /// Preserve the fake compositor's short Unix socket paths even when the
 /// system's temporary directory (notably on macOS) has a long name.
 pub fn short_root() -> PathBuf {
-    let base = std::env::temp_dir();
-    if base.as_os_str().len() <= 40 {
-        root()
-    } else {
-        process_dir(&SHORT_ROOT, PathBuf::from("/tmp"))
+    #[cfg(unix)]
+    {
+        let base = std::env::temp_dir();
+        if base.as_os_str().len() > 40 {
+            return process_dir(&SHORT_ROOT, PathBuf::from("/tmp"));
+        }
     }
+    root()
 }

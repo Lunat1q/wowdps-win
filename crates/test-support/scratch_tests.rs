@@ -38,11 +38,9 @@ fn a_forced_symlink_collision_preserves_its_target() {
 
 fn collision_case(mode: &str) {
     let parent = Dir::new_in(&test_scratch::root());
-    let output = std::process::Command::new(std::env::current_exe().unwrap())
-        .args(["--exact", "scratch_tests::child_process", "--nocapture"])
+    let output = test_child(parent.path())
         .env("WOWDPS_SCRATCH_CHILD", mode)
         .env("WOWDPS_COLLISION_PARENT", parent.path())
-        .env("TMPDIR", parent.path())
         .output()
         .unwrap();
     assert!(output.status.success(), "{output:?}");
@@ -76,10 +74,8 @@ fn collision_case(mode: &str) {
 fn process_roots_are_removed_after_successful_and_failed_test_runs() {
     for fail in [false, true] {
         let parent = Dir::new_in(&test_scratch::root());
-        let output = std::process::Command::new(std::env::current_exe().unwrap())
-            .args(["--exact", "scratch_tests::child_process", "--nocapture"])
+        let output = test_child(parent.path())
             .env("WOWDPS_SCRATCH_CHILD", if fail { "fail" } else { "pass" })
-            .env("TMPDIR", parent.path())
             .output()
             .unwrap();
         assert_eq!(output.status.success(), !fail, "{output:?}");
@@ -94,15 +90,14 @@ fn process_roots_are_removed_after_successful_and_failed_test_runs() {
     }
 }
 
+#[cfg(unix)]
 #[test]
 fn long_temp_paths_keep_socket_roots_short_and_clean() {
     let parent = Dir::new_in(&test_scratch::root());
     let long = parent.path().join("long-temporary-directory-".repeat(3));
     std::fs::create_dir(&long).unwrap();
-    let output = std::process::Command::new(std::env::current_exe().unwrap())
-        .args(["--exact", "scratch_tests::child_process", "--nocapture"])
+    let output = test_child(&long)
         .env("WOWDPS_SCRATCH_CHILD", "short")
-        .env("TMPDIR", &long)
         .output()
         .unwrap();
     assert!(output.status.success(), "{output:?}");
@@ -169,4 +164,33 @@ fn child_process() {
     };
     println!("scratch-root={}", root.display());
     assert_ne!(mode, "fail", "test body failed");
+}
+
+fn test_child(parent: &std::path::Path) -> std::process::Command {
+    let mut command = std::process::Command::new(std::env::current_exe().unwrap());
+    command.args(["--exact", "scratch_tests::child_process", "--nocapture"]);
+    command
+        .env("TMPDIR", parent)
+        .env("TMP", parent)
+        .env("TEMP", parent);
+    command
+}
+
+#[test]
+fn subprocess_temp_override_covers_each_platform_variable() {
+    let parent = Dir::new_in(&test_scratch::root());
+    let command = test_child(parent.path());
+    for name in ["TMPDIR", "TMP", "TEMP"] {
+        let value = command
+            .get_envs()
+            .find(|(key, _)| *key == name)
+            .and_then(|(_, value)| value);
+        assert_eq!(value, Some(parent.path().as_os_str()), "{name}");
+    }
+}
+
+#[cfg(not(unix))]
+#[test]
+fn non_unix_short_root_uses_the_platform_temp_parent() {
+    assert_eq!(test_scratch::short_root(), test_scratch::root());
 }
