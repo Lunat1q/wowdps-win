@@ -557,7 +557,8 @@ pub(crate) mod tests {
     #[test]
     fn the_gui_spawner_runs_the_binary_keeps_stderr_and_terminates() {
         use std::os::unix::fs::PermissionsExt;
-        let dir = std::env::temp_dir().join(format!("wowdps-overlay-{}", std::process::id()));
+        let dir =
+            crate::test_scratch::root().join(format!("wowdps-overlay-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         let script = |name: &str, body: &str| {
@@ -642,7 +643,8 @@ pub(crate) mod tests {
     fn a_named_gui_binary_spawns_beside_the_daemon_else_from_path() {
         use crate::config::Config;
         use std::os::unix::fs::PermissionsExt;
-        let dir = std::env::temp_dir().join(format!("wowdps-overlay-named-{}", std::process::id()));
+        let dir = crate::test_scratch::root()
+            .join(format!("wowdps-overlay-named-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         let exe = dir.join("wowdps");
@@ -721,7 +723,8 @@ pub(crate) mod tests {
         );
         assert!(!sup.holds_daemon_open() || sup.state() == OverlayState::Visible);
 
-        let dir = std::env::temp_dir().join(format!("wowdps-overlay-spew-{}", std::process::id()));
+        let dir =
+            crate::test_scratch::root().join(format!("wowdps-overlay-spew-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         let script = dir.join("spew");

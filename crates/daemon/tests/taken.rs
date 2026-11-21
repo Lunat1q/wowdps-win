@@ -559,7 +559,8 @@ struct Temp(std::path::PathBuf);
 
 impl Temp {
     fn new(tag: &str) -> Self {
-        let p = std::env::temp_dir().join(format!("wowdps-taken-{tag}-{}", std::process::id()));
+        let p =
+            crate::test_scratch::root().join(format!("wowdps-taken-{tag}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&p);
         std::fs::create_dir_all(&p).unwrap();
         Temp(p)
@@ -1833,3 +1834,6 @@ fn real_log_rows_tier_taken_lists_measured() {
         worst_growth.1
     );
 }
+
+#[path = "../../test-support/scratch.rs"]
+mod test_scratch;

@@ -29,7 +29,8 @@ struct Temp(PathBuf);
 
 impl Temp {
     fn new(tag: &str) -> Self {
-        let p = std::env::temp_dir().join(format!("wowdps-ipc-{tag}-{}", std::process::id()));
+        let p = crate::test_scratch::short_root()
+            .join(format!("wowdps-ipc-{tag}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&p);
         // The panic bans reach helpers outside `#[test]` fns, so scaffolding
         // failures assert rather than unwrap.
@@ -982,3 +983,6 @@ fn a_daemon_follows_one_source_per_edition_and_moves_its_followers() {
     follower.send(&ClientMsg::Shutdown);
     let _ = d.done.recv_timeout(DEADLINE);
 }
+
+#[path = "../../test-support/scratch.rs"]
+mod test_scratch;

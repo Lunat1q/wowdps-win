@@ -58,11 +58,37 @@ fn process_roots_are_removed_after_successful_and_failed_test_runs() {
 }
 
 #[test]
+fn long_temp_paths_keep_socket_roots_short_and_clean() {
+    let parent = Dir::new_in(&test_scratch::root());
+    let long = parent.path().join("long-temporary-directory-".repeat(3));
+    std::fs::create_dir(&long).unwrap();
+    let output = std::process::Command::new(std::env::current_exe().unwrap())
+        .args(["--exact", "scratch_tests::child_process", "--nocapture"])
+        .env("WOWDPS_SCRATCH_CHILD", "short")
+        .env("TMPDIR", &long)
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "{output:?}");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let path = stdout
+        .lines()
+        .find_map(|line| line.strip_prefix("scratch-root="))
+        .expect("the child exercised the short root");
+    assert!(path.len() < 70, "room for the compositor's socket suffix");
+    assert!(!std::path::Path::new(path).exists(), "{path}");
+    assert_eq!(std::fs::read_dir(&long).unwrap().count(), 0);
+}
+
+#[test]
 fn child_process() {
     let Ok(mode) = std::env::var("WOWDPS_SCRATCH_CHILD") else {
         return;
     };
-    let root = test_scratch::root();
+    let root = if mode == "short" {
+        test_scratch::short_root()
+    } else {
+        test_scratch::root()
+    };
     std::fs::write(root.join("file"), b"scratch").unwrap();
     #[cfg(unix)]
     let _socket = std::os::unix::net::UnixListener::bind(root.join("socket")).unwrap();

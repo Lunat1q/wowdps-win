@@ -807,7 +807,7 @@ static SEQ: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new
 
 impl Temp {
     fn new(tag: &str) -> Self {
-        let p = std::env::temp_dir().join(format!(
+        let p = crate::test_scratch::root().join(format!(
             "wowdps-support-{tag}-{}-{}",
             std::process::id(),
             SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
@@ -891,3 +891,6 @@ fn the_mock_daemons_store_writes_the_same_card() {
     assert_eq!(e.effective(), 86_100);
     assert_eq!(player(card, PRIEST).overheal, 16_000);
 }
+
+#[path = "../../test-support/scratch.rs"]
+mod test_scratch;

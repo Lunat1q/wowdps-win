@@ -50,7 +50,8 @@ struct Temp(PathBuf);
 
 impl Temp {
     fn new(tag: &str) -> Self {
-        let p = std::env::temp_dir().join(format!("wowdps-lake-{tag}-{}", std::process::id()));
+        let p =
+            crate::test_scratch::root().join(format!("wowdps-lake-{tag}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&p);
         std::fs::create_dir_all(&p).unwrap();
         Temp(p)
@@ -6315,3 +6316,6 @@ fn a_keys_affixes_are_a_column_on_every_lake() {
         ]
     );
 }
+
+#[path = "../../test-support/scratch.rs"]
+mod test_scratch;

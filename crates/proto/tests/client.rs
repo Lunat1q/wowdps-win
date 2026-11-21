@@ -334,7 +334,8 @@ fn reconnecting_is_refused_without_a_daemon_binary() {
 /// re-declares its cursor unprompted.
 #[test]
 fn spawning_reconnecting_and_squatted_dirs() {
-    let tmp = std::env::temp_dir().join(format!("wowdps-client-test-{}", std::process::id()));
+    let tmp = crate::test_scratch::short_root()
+        .join(format!("wowdps-client-test-{}", std::process::id()));
     std::fs::create_dir_all(&tmp).expect("temp dir");
     // Env is process-global: this integration binary's only env-touching
     // test, mirroring the unit-test precedent in client.rs.
@@ -521,3 +522,6 @@ fn the_tick_reconnect_fails_plainly_without_a_daemon_binary() {
     assert!(matches!(client.try_reconnect(), Reconnect::Failed(_)));
     assert!(client.is_dead());
 }
+
+#[path = "../../test-support/scratch.rs"]
+mod test_scratch;

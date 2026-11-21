@@ -1613,7 +1613,7 @@ mod tests {
 
     #[test]
     fn load_range_returns_exactly_the_requested_lines() {
-        let dir = std::env::temp_dir().join(format!("wowdps-idx-{}", std::process::id()));
+        let dir = crate::test_scratch::root().join(format!("wowdps-idx-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("log.txt");
         let lines = [at(0, 0, HIT), at(0, 1, HIT), at(0, 2, HIT)];

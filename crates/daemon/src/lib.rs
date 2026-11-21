@@ -343,3 +343,7 @@ fn spawn_tail(
         }
     });
 }
+
+#[cfg(test)]
+#[path = "../../test-support/scratch.rs"]
+mod test_scratch;

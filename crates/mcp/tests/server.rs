@@ -31,7 +31,8 @@ struct Temp(PathBuf);
 
 impl Temp {
     fn new(tag: &str) -> Self {
-        let p = std::env::temp_dir().join(format!("wowdps-mcp-{tag}-{}", std::process::id()));
+        let p = crate::test_scratch::short_root()
+            .join(format!("wowdps-mcp-{tag}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&p);
         assert!(std::fs::create_dir_all(&p).is_ok(), "mkdir {p:?}");
         Temp(p)
@@ -3880,3 +3881,6 @@ fn the_history_tools_keep_editions_apart() {
         error_text(&reply)
     );
 }
+
+#[path = "../../test-support/scratch.rs"]
+mod test_scratch;

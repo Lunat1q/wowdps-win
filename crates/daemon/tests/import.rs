@@ -38,8 +38,8 @@ impl Temp {
     fn new(tag: &str) -> Self {
         static N: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
         let n = N.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        let p =
-            std::env::temp_dir().join(format!("wowdps-import-{tag}-{}-{n}", std::process::id()));
+        let p = crate::test_scratch::root()
+            .join(format!("wowdps-import-{tag}-{}-{n}", std::process::id()));
         let _ = std::fs::remove_dir_all(&p);
         std::fs::create_dir_all(&p).unwrap();
         Temp(p)
@@ -1557,3 +1557,6 @@ fn a_failed_restore_is_said_beside_the_failed_write() {
         "without a replay, as said"
     );
 }
+
+#[path = "../../test-support/scratch.rs"]
+mod test_scratch;

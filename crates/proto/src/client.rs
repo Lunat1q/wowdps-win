@@ -476,7 +476,8 @@ mod tests {
     fn preparing_the_dir_makes_it_private_to_us() {
         // Point the dir somewhere disposable for the duration of this test.
         // Env is process-global, but this is the only test that touches it.
-        let tmp = std::env::temp_dir().join(format!("wowdps-proto-test-{}", std::process::id()));
+        let tmp =
+            crate::test_scratch::root().join(format!("wowdps-proto-test-{}", std::process::id()));
         unsafe { std::env::set_var("XDG_RUNTIME_DIR", &tmp) };
         std::fs::create_dir_all(&tmp).unwrap();
         let dir = prepare_socket_dir().unwrap();
@@ -488,7 +489,8 @@ mod tests {
 
     #[test]
     fn the_uid_probe_steps_past_leftovers_and_agrees_across_threads() {
-        let dir = std::env::temp_dir().join(format!("wowdps-uid-probe-{}", std::process::id()));
+        let dir =
+            crate::test_scratch::root().join(format!("wowdps-uid-probe-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let me = std::fs::metadata(&dir).unwrap().uid();
         // A crashed process that had our pid left the first name behind.

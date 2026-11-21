@@ -52,7 +52,8 @@ impl Temp {
         // would wipe the first one's log out from under it mid-read.
         static N: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
         let n = N.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        let p = std::env::temp_dir().join(format!("wowdps-hist-{tag}-{}-{n}", std::process::id()));
+        let p = crate::test_scratch::short_root()
+            .join(format!("wowdps-hist-{tag}-{}-{n}", std::process::id()));
         let _ = std::fs::remove_dir_all(&p);
         std::fs::create_dir_all(&p).unwrap();
         Temp(p)
@@ -5292,3 +5293,6 @@ fn a_kill_is_kept_whole_unless_the_config_says_not() {
     assert!(!store.has_details(&ids[0]), "the slower kill is demoted");
     assert!(store.has_details(&ids[1]), "the fastest stays protected");
 }
+
+#[path = "../../test-support/scratch.rs"]
+mod test_scratch;

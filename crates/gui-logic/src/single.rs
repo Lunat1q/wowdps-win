@@ -86,8 +86,8 @@ mod tests {
 
     impl Scratch {
         fn new(name: &str) -> Self {
-            let dir =
-                std::env::temp_dir().join(format!("wowdps-single-{}-{name}", std::process::id()));
+            let dir = crate::test_scratch::short_root()
+                .join(format!("wowdps-single-{}-{name}", std::process::id()));
             std::fs::create_dir_all(&dir).expect("test dir");
             Self(dir)
         }

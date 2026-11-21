@@ -304,7 +304,8 @@ mod tests {
     }
 
     fn fake_proc(tag: &str, procs: &[(&str, &str, &str)]) -> std::path::PathBuf {
-        let root = std::env::temp_dir().join(format!("wowdps-proc-{tag}-{}", std::process::id()));
+        let root =
+            crate::test_scratch::root().join(format!("wowdps-proc-{tag}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         for (pid, comm, cmdline) in procs {
             let d = root.join(pid);

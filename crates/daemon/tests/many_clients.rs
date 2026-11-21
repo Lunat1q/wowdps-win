@@ -23,7 +23,8 @@ struct Temp(PathBuf);
 
 impl Temp {
     fn new(tag: &str) -> Self {
-        let p = std::env::temp_dir().join(format!("wowdps-many-{tag}-{}", std::process::id()));
+        let p = crate::test_scratch::short_root()
+            .join(format!("wowdps-many-{tag}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&p);
         // The panic bans reach helpers outside `#[test]` fns, so scaffolding
         // failures assert rather than unwrap.
@@ -397,3 +398,6 @@ fn churn_does_not_wedge_the_daemon_or_leak_sessions() {
     let result = d.done.recv_timeout(DEADLINE).expect("daemon exited");
     assert!(result.is_ok(), "{result:?}");
 }
+
+#[path = "../../test-support/scratch.rs"]
+mod test_scratch;

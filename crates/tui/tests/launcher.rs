@@ -38,7 +38,8 @@ struct Sandbox {
 impl Sandbox {
     fn new(tag: &str) -> Self {
         // Short: the socket path must fit a sockaddr_un.
-        let root = std::env::temp_dir().join(format!("wdt-{tag}-{}", std::process::id()));
+        let root =
+            crate::test_scratch::short_root().join(format!("wdt-{tag}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         for sub in ["rt", "state", "cache", "config/wowdps", "home", "bin"] {
             std::fs::create_dir_all(root.join(sub)).unwrap();
@@ -551,3 +552,6 @@ fn the_tui_client_spawns_the_daemon_then_reports_a_missing_terminal() {
     sb.wait_socket(false);
     sb.wait_log_contains("clean exit");
 }
+
+#[path = "../../test-support/scratch.rs"]
+mod test_scratch;

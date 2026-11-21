@@ -453,7 +453,8 @@ mod tests {
     #[cfg(not(target_os = "macos"))]
     #[test]
     fn install_discovery_scans_steam_prefixes_and_prefers_the_newest() {
-        let home = std::env::temp_dir().join(format!("wowdps-cli-test-{}", std::process::id()));
+        let home =
+            crate::test_scratch::root().join(format!("wowdps-cli-test-{}", std::process::id()));
         let mk = |steam_root: &str, appid: &str| {
             let wow = home
                 .join(steam_root)
@@ -499,7 +500,8 @@ mod tests {
     fn install_discovery_checks_the_applications_roots() {
         // An install under a temp HOME's Applications folder is found; the
         // real /Applications is validated on the machine that has the game.
-        let home = std::env::temp_dir().join(format!("wowdps-cli-mac-{}", std::process::id()));
+        let home =
+            crate::test_scratch::root().join(format!("wowdps-cli-mac-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&home);
         std::fs::create_dir_all(home.join("Applications/World of Warcraft/Data/data")).unwrap();
         std::fs::write(home.join("Applications/World of Warcraft/.build.info"), "x").unwrap();
@@ -528,7 +530,8 @@ mod tests {
     /// and Forever: each one's folder names the other's.
     #[test]
     fn a_logs_folder_names_its_install_and_the_followed_products_beside_it() {
-        let root = std::env::temp_dir().join(format!("wowdps-cli-sib-{}", std::process::id()));
+        let root =
+            crate::test_scratch::root().join(format!("wowdps-cli-sib-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         let wow = root.join("World of Warcraft");
         std::fs::create_dir_all(wow.join("Data").join("data")).unwrap();
@@ -696,7 +699,8 @@ mod tests {
     /// yields nothing rather than a made-up path.
     #[test]
     fn default_logs_dir_honors_the_override_then_discovery() {
-        let root = std::env::temp_dir().join(format!("wowdps-cli-env-{}", std::process::id()));
+        let root =
+            crate::test_scratch::root().join(format!("wowdps-cli-env-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         let wow = root.join("wow");
         std::fs::create_dir_all(wow.join("Data").join("data")).unwrap();

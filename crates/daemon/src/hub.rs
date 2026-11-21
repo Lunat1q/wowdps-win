@@ -2725,7 +2725,8 @@ mod tests {
         }
 
         // Forever's log rotates (the same fixture under another name).
-        let dir = std::env::temp_dir().join(format!("wowdps-hub-rot-{}", std::process::id()));
+        let dir =
+            crate::test_scratch::root().join(format!("wowdps-hub-rot-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let next = dir.join("WoWCombatLog-110226_200000.txt");
         std::fs::copy(FOREVER, &next).unwrap();
@@ -3179,7 +3180,8 @@ mod tests {
 
     /// `text` under `name` in a scratch folder of its own for this test.
     fn scratch_log(tag: &str, name: &str, text: &str) -> (PathBuf, String) {
-        let dir = std::env::temp_dir().join(format!("wowdps-hub-{tag}-{}", std::process::id()));
+        let dir =
+            crate::test_scratch::root().join(format!("wowdps-hub-{tag}-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join(name);
         std::fs::write(&path, text).unwrap();

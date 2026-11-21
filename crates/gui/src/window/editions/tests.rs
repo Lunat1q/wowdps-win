@@ -529,7 +529,7 @@ fn a_pin_that_catches_up_with_the_game_played_follows_it(cx: &mut TestAppContext
 /// edition.
 #[gpui_kit::test]
 fn an_empty_game_says_how_to_get_a_fight(cx: &mut TestAppContext) {
-    let dir = std::env::temp_dir().join(format!(
+    let dir = wowdps_gui_logic::test_scratch::root().join(format!(
         "wowdps-gui-empty-forever-{}-{:?}",
         std::process::id(),
         std::thread::current().id()

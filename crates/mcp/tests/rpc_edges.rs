@@ -11,7 +11,7 @@ use wowdps_mcp::{bridge::Bridge, json, json::Json, rpc};
 fn sandbox() {
     static ONCE: std::sync::Once = std::sync::Once::new();
     ONCE.call_once(|| {
-        let root = std::env::temp_dir().join(format!("wdm-{}", std::process::id()));
+        let root = crate::test_scratch::root().join(format!("wdm-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(root.join("rt")).unwrap();
         std::fs::create_dir_all(root.join("bin")).unwrap();
@@ -171,3 +171,6 @@ fn an_unreachable_daemon_is_a_tool_error_not_a_dead_transport() {
         assert!(text.contains("cannot reach or spawn the daemon"), "{text}");
     }
 }
+
+#[path = "../../test-support/scratch.rs"]
+mod test_scratch;

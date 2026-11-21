@@ -30,7 +30,7 @@ const DEADLINE: Duration = Duration::from_secs(15);
 fn sandbox() -> PathBuf {
     static ROOT: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
     ROOT.get_or_init(|| {
-        let root = std::env::temp_dir().join(format!("wdp-{}", std::process::id()));
+        let root = crate::test_scratch::short_root().join(format!("wdp-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         for sub in ["rt", "cache", "home", "data"] {
             std::fs::create_dir_all(root.join(sub)).unwrap();
@@ -672,3 +672,6 @@ fn a_typed_log_names_no_owner_and_the_install_s_folder_does() {
     let _ = std::fs::remove_dir_all(root.join("typed"));
     let _ = std::fs::remove_dir_all(root.join("own"));
 }
+
+#[path = "../../test-support/scratch.rs"]
+mod test_scratch;

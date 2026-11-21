@@ -32,8 +32,8 @@ impl Temp {
     fn new(tag: &str) -> Self {
         static N: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
         let n = N.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        let p =
-            std::env::temp_dir().join(format!("wowdps-editions-{tag}-{}-{n}", std::process::id()));
+        let p = crate::test_scratch::root()
+            .join(format!("wowdps-editions-{tag}-{}-{n}", std::process::id()));
         let _ = std::fs::remove_dir_all(&p);
         std::fs::create_dir_all(&p).unwrap();
         Temp(p)
@@ -1766,3 +1766,6 @@ fn line_times_compare_across_midnight_the_year_and_daylight_saving() {
     assert_eq!(at("11/2 10:00:00.000"), None, "the legacy format");
     assert_eq!(line_utc_ms("no time here"), None);
 }
+
+#[path = "../../test-support/scratch.rs"]
+mod test_scratch;

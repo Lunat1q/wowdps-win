@@ -128,7 +128,7 @@ mod tests {
 
     #[test]
     fn absent_truncated_or_garbage_reads_as_none() {
-        let absent = std::env::temp_dir().join(format!(
+        let absent = crate::test_scratch::root().join(format!(
             "wowdps-emblems-test-{}-absent.bin",
             std::process::id()
         ));
@@ -155,7 +155,7 @@ mod tests {
 
     #[test]
     fn a_file_on_disk_reads_whole() {
-        let path = std::env::temp_dir().join(format!(
+        let path = crate::test_scratch::root().join(format!(
             "wowdps-emblems-test-{}-valid.bin",
             std::process::id()
         ));

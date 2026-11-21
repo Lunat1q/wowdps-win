@@ -355,7 +355,7 @@ fn a_live_visits_overall_absorbs_its_scanned_prefix() {
     let cut = text
         .rfind("ENCOUNTER_END")
         .expect("the fixture has encounters");
-    let dir = std::env::temp_dir().join(format!("wowdps-engine-{}", std::process::id()));
+    let dir = crate::test_scratch::root().join(format!("wowdps-engine-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("live.txt");
     std::fs::write(&path, &bytes[..cut]).unwrap();
@@ -468,7 +468,8 @@ fn a_live_overall_reads_its_first_members_edition() {
         "ENCOUNTER_START,3010,\"Cauldron of Carnage\",16,20,2769",
     );
     text += &hit("20:03:05", 300);
-    let dir = std::env::temp_dir().join(format!("wowdps-engine-edition-{}", std::process::id()));
+    let dir =
+        crate::test_scratch::root().join(format!("wowdps-engine-edition-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("live.txt");
     std::fs::write(&path, &text).unwrap();
@@ -544,3 +545,6 @@ fn a_live_overall_reads_its_first_members_edition() {
     );
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[path = "../../test-support/scratch.rs"]
+mod test_scratch;

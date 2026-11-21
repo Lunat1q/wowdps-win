@@ -568,7 +568,7 @@ fn an_overall_reads_its_members_edition_lazy_or_full() {
         let want = read_of(&full.overall(0).unwrap());
         assert_eq!(want, pull, "{name}: the full replay's Σ");
 
-        let path = std::env::temp_dir().join(format!(
+        let path = crate::test_scratch::root().join(format!(
             "wowdps-forever-overall-{name}-{}.txt",
             std::process::id()
         ));
@@ -605,8 +605,8 @@ fn a_live_overall_merged_with_its_prefix_reads_as_the_full_replay() {
     let want = read_of(&full.overall(0).unwrap());
     assert_eq!((want.0, want.1, want.2), ((12, 1, 0), 1, 22));
 
-    let path =
-        std::env::temp_dir().join(format!("wowdps-forever-attach-{}.txt", std::process::id()));
+    let path = crate::test_scratch::root()
+        .join(format!("wowdps-forever-attach-{}.txt", std::process::id()));
     std::fs::write(&path, &attach).unwrap();
     let idx = scan(&mut std::fs::File::open(&path).unwrap());
     let prefix = load_segment_text(&path, idx.open_visit.as_ref().unwrap())
@@ -645,3 +645,6 @@ fn a_live_overall_merged_with_its_prefix_reads_as_the_full_replay() {
     assert_eq!(total(&got), total(&want));
     std::fs::remove_file(&path).unwrap();
 }
+
+#[path = "../../test-support/scratch.rs"]
+mod test_scratch;

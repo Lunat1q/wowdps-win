@@ -133,7 +133,7 @@ fn a_whole_file_serves_each_spell_and_none_for_another() {
 
 #[test]
 fn an_absent_or_garbage_file_opens_as_none() {
-    let dir = std::env::temp_dir().join(format!("spell-tips-{}", std::process::id()));
+    let dir = crate::test_scratch::root().join(format!("spell-tips-{}", std::process::id()));
     assert!(SpellTips::open_at(&dir.join("absent.bin")).is_none());
     assert!(SpellTips::from_bytes(Vec::new()).is_none());
     assert!(SpellTips::from_bytes(b"WDPI\x01\0\0\0".to_vec()).is_none());

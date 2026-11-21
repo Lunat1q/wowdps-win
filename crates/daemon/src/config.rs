@@ -386,7 +386,8 @@ overlay_exit_grace_secs = 60
     /// where a sibling of the same file name exists.
     #[test]
     fn gui_bin_is_the_sibling_else_path_and_a_slash_means_a_path() {
-        let dir = std::env::temp_dir().join(format!("wowdps-config-gui-{}", std::process::id()));
+        let dir =
+            crate::test_scratch::root().join(format!("wowdps-config-gui-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::write(dir.join("wowdps-gui-dev"), "").unwrap();
@@ -479,7 +480,8 @@ logs_dir = "/ok"   # with a trailing comment
     /// and `load` reads whatever is there.
     #[test]
     fn the_path_follows_the_environment_and_load_reads_it() {
-        let root = std::env::temp_dir().join(format!("wowdps-config-{}", std::process::id()));
+        let root =
+            crate::test_scratch::root().join(format!("wowdps-config-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(root.join("wowdps")).unwrap();
         // Env is process-global; this is the only test touching it.

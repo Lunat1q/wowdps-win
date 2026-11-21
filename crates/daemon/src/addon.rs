@@ -206,7 +206,8 @@ mod tests {
     use super::*;
 
     fn fake_install(tag: &str, version: &str) -> PathBuf {
-        let root = std::env::temp_dir().join(format!("wowdps-addon-{tag}-{}", std::process::id()));
+        let root =
+            crate::test_scratch::root().join(format!("wowdps-addon-{tag}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         let wow = root.join("World of Warcraft");
         std::fs::create_dir_all(wow.join("Data").join("data")).unwrap();
