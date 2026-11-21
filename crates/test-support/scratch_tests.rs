@@ -282,3 +282,74 @@ fn an_owned_case_cannot_succeed_without_entering_its_body() {
         "a zero-test child is not a successful test"
     );
 }
+
+#[test]
+fn successful_isolated_output_obeys_parent_capture_modes() {
+    for (no_capture_flag, no_capture_env, visible) in
+        [(true, "0", true), (false, "1", true), (false, "0", false)]
+    {
+        let mut command = std::process::Command::new(std::env::current_exe().unwrap());
+        command
+            .args(["--exact", "scratch_tests::isolated_output_probe"])
+            .env("WOWDPS_OUTPUT_PROBE", "success")
+            .env("RUST_TEST_NOCAPTURE", no_capture_env);
+        if no_capture_flag {
+            command.arg("--nocapture");
+        }
+        let output = command.output().unwrap();
+        assert!(output.status.success(), "{output:?}");
+        for (stream, marker) in [
+            (&output.stdout, "successful-isolated-stdout-marker"),
+            (&output.stderr, "successful-isolated-stderr-marker"),
+        ] {
+            let text = String::from_utf8_lossy(stream);
+            assert_eq!(
+                text.matches(marker).count(),
+                usize::from(visible),
+                "flag={no_capture_flag}, env={no_capture_env}, marker={marker}: {text}"
+            );
+        }
+    }
+}
+
+#[test]
+fn failed_isolated_output_keeps_both_streams_in_diagnostics() {
+    let output = std::process::Command::new(std::env::current_exe().unwrap())
+        .args([
+            "--exact",
+            "scratch_tests::isolated_output_probe",
+            "--nocapture",
+        ])
+        .env("WOWDPS_OUTPUT_PROBE", "fail")
+        .env("RUST_TEST_NOCAPTURE", "0")
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(101));
+    let text = format!(
+        "{}{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    for marker in [
+        "successful-isolated-stdout-marker",
+        "successful-isolated-stderr-marker",
+        "stdout:",
+        "stderr:",
+        "deliberate output failure",
+    ] {
+        assert!(text.contains(marker), "missing {marker}: {text}");
+    }
+}
+
+#[test]
+fn isolated_output_probe() {
+    let Ok(mode) = std::env::var("WOWDPS_OUTPUT_PROBE") else {
+        return;
+    };
+    if test_scratch::process::isolate("scratch_tests::isolated_output_probe") {
+        return;
+    }
+    println!("successful-isolated-stdout-marker");
+    eprintln!("successful-isolated-stderr-marker");
+    assert_ne!(mode, "fail", "deliberate output failure");
+}

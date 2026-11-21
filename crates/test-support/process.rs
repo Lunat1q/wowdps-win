@@ -101,5 +101,9 @@ pub fn isolate(test: &str) -> bool {
         String::from_utf8_lossy(&result.output.stdout),
         String::from_utf8_lossy(&result.output.stderr)
     );
+    // Use the print macros, not raw stdout/stderr handles: libtest's
+    // thread-local capture must still decide whether successful output shows.
+    print!("{}", String::from_utf8_lossy(&result.output.stdout));
+    eprint!("{}", String::from_utf8_lossy(&result.output.stderr));
     true
 }

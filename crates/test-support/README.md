@@ -35,3 +35,11 @@ read-only gate using a caller-configured dataset does not need this boundary.
 For writer tests, preserve any external read-only input explicitly before
 redirecting HOME or the XDG directories; scratch outputs still belong to the
 owned process root.
+
+Successful child stdout and stderr are replayed through the parent's test
+output macros after completion. Normal libtest capture therefore hides
+successful output, while `--nocapture` or `RUST_TEST_NOCAPTURE=1` reveals it.
+Failed children retain their labeled stdout/stderr diagnostics. Keep a
+visible-marker regression for both streams and both uncaptured modes when
+changing the process runner. Cross-stream timing is not preserved by the
+completed-stream replay.
