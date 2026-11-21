@@ -74,7 +74,12 @@ fn long_temp_paths_keep_socket_roots_short_and_clean() {
         .lines()
         .find_map(|line| line.strip_prefix("scratch-root="))
         .expect("the child exercised the short root");
-    assert!(path.len() < 70, "room for the compositor's socket suffix");
+    let socket = stdout
+        .lines()
+        .find_map(|line| line.strip_prefix("scratch-socket="))
+        .expect("the child bound the complete socket suffix");
+    let capacity = if cfg!(target_os = "linux") { 108 } else { 104 };
+    assert!(socket.len() < capacity, "full socket path: {socket}");
     assert!(!std::path::Path::new(path).exists(), "{path}");
     assert_eq!(std::fs::read_dir(&long).unwrap().count(), 0);
 }
@@ -91,7 +96,16 @@ fn child_process() {
     };
     std::fs::write(root.join("file"), b"scratch").unwrap();
     #[cfg(unix)]
-    let _socket = std::os::unix::net::UnixListener::bind(root.join("socket")).unwrap();
+    let _socket = if mode == "short" {
+        let dir = root.join(format!("wowdps-lake-parity-{}", std::process::id()));
+        std::fs::create_dir(&dir).unwrap();
+        let socket = dir.join("test.sock");
+        let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+        println!("scratch-socket={}", socket.display());
+        Some(listener)
+    } else {
+        None
+    };
     println!("scratch-root={}", root.display());
     assert_ne!(mode, "fail", "test body failed");
 }

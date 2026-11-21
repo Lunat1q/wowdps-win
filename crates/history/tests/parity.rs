@@ -50,8 +50,8 @@ struct Temp(PathBuf);
 
 impl Temp {
     fn new(tag: &str) -> Self {
-        let p =
-            crate::test_scratch::root().join(format!("wowdps-lake-{tag}-{}", std::process::id()));
+        let p = crate::test_scratch::short_root()
+            .join(format!("wowdps-lake-{tag}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&p);
         std::fs::create_dir_all(&p).unwrap();
         Temp(p)
@@ -6319,3 +6319,32 @@ fn a_keys_affixes_are_a_column_on_every_lake() {
 
 #[path = "../../test-support/scratch.rs"]
 mod test_scratch;
+
+#[test]
+fn parity_socket_fits_when_the_system_temp_path_is_long() {
+    const CASE: &str = "parity_socket_fits_when_the_system_temp_path_is_long";
+    if std::env::var_os("WOWDPS_PARITY_LONG_TMP").is_some() {
+        let tmp = Temp::new("parity");
+        let socket = tmp.0.join("test.sock");
+        let capacity = if cfg!(target_os = "linux") { 108 } else { 104 };
+        assert!(
+            socket.as_os_str().len() < capacity,
+            "socket path: {socket:?}"
+        );
+        let bound = std::os::unix::net::UnixListener::bind(&socket);
+        assert!(bound.is_ok(), "bind {socket:?}: {bound:?}");
+        return;
+    }
+    let parent = test_scratch::Dir::new_in(&test_scratch::short_root());
+    let long = parent
+        .path()
+        .join("x".repeat(76 - parent.path().as_os_str().len() - 1));
+    std::fs::create_dir(&long).unwrap();
+    let output = std::process::Command::new(std::env::current_exe().unwrap())
+        .args(["--exact", CASE, "--nocapture"])
+        .env("WOWDPS_PARITY_LONG_TMP", "1")
+        .env("TMPDIR", &long)
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "{output:?}");
+}
