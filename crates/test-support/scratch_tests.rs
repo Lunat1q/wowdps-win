@@ -26,13 +26,50 @@ fn a_panicking_test_body_removes_its_directory() {
 }
 
 #[test]
-fn creating_a_guard_preserves_an_existing_directory() {
+fn a_forced_directory_collision_survives_guard_and_exit_cleanup() {
+    collision_case("collision-directory");
+}
+
+#[cfg(unix)]
+#[test]
+fn a_forced_symlink_collision_preserves_its_target() {
+    collision_case("collision-symlink");
+}
+
+fn collision_case(mode: &str) {
     let parent = Dir::new_in(&test_scratch::root());
-    let first = Dir::new_in(parent.path());
-    std::fs::write(first.path().join("keep"), b"owned").unwrap();
-    let second = Dir::new_in(parent.path());
-    assert_ne!(first.path(), second.path());
-    assert_eq!(std::fs::read(first.path().join("keep")).unwrap(), b"owned");
+    let output = std::process::Command::new(std::env::current_exe().unwrap())
+        .args(["--exact", "scratch_tests::child_process", "--nocapture"])
+        .env("WOWDPS_SCRATCH_CHILD", mode)
+        .env("WOWDPS_COLLISION_PARENT", parent.path())
+        .env("TMPDIR", parent.path())
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "{output:?}");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let candidate = stdout
+        .lines()
+        .find_map(|line| line.strip_prefix("collision-candidate="))
+        .expect("the child planted its first candidate");
+    let candidate = std::path::Path::new(candidate);
+    assert!(candidate.starts_with(parent.path()));
+    assert_eq!(std::fs::read(candidate.join("keep")).unwrap(), b"original");
+    if mode == "collision-symlink" {
+        assert!(
+            std::fs::symlink_metadata(candidate)
+                .unwrap()
+                .file_type()
+                .is_symlink()
+        );
+        assert_eq!(
+            std::fs::read(parent.path().join("target/keep")).unwrap(),
+            b"original"
+        );
+        assert_eq!(std::fs::read_dir(parent.path()).unwrap().count(), 2);
+    } else {
+        assert!(std::fs::symlink_metadata(candidate).unwrap().is_dir());
+        assert_eq!(std::fs::read_dir(parent.path()).unwrap().count(), 1);
+    }
 }
 
 #[test]
@@ -89,6 +126,30 @@ fn child_process() {
     let Ok(mode) = std::env::var("WOWDPS_SCRATCH_CHILD") else {
         return;
     };
+    if mode.starts_with("collision-") {
+        let parent = std::path::PathBuf::from(std::env::var_os("WOWDPS_COLLISION_PARENT").unwrap());
+        // This re-exec has not allocated anything: its NEXT value is zero.
+        let candidate = parent.join(format!("wd-{}-0", std::process::id()));
+        let target = if mode == "collision-symlink" {
+            parent.join("target")
+        } else {
+            candidate.clone()
+        };
+        std::fs::create_dir(&target).unwrap();
+        std::fs::write(target.join("keep"), b"original").unwrap();
+        #[cfg(unix)]
+        if mode == "collision-symlink" {
+            std::os::unix::fs::symlink(&target, &candidate).unwrap();
+        }
+        let root = test_scratch::root();
+        assert_ne!(root, candidate, "the planted candidate must not be adopted");
+        let guard = Dir::new_in(&parent);
+        std::fs::write(guard.path().join("owned"), b"scratch").unwrap();
+        drop(guard);
+        assert_eq!(std::fs::read(candidate.join("keep")).unwrap(), b"original");
+        println!("collision-candidate={}", candidate.display());
+        return;
+    }
     let root = if mode == "short" {
         test_scratch::short_root()
     } else {
