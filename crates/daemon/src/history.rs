@@ -568,6 +568,8 @@ pub fn spawn(
             product: opts.addon_dir.clone(),
             addon: None,
             saved_variables: HashMap::new(),
+            saved_variables_error: None,
+            published_error: None,
         };
         worker.check_addon();
         worker.poll_saved_variables();
@@ -693,6 +695,11 @@ struct Worker<B: Backend> {
     /// Each account's `wowdps.lua` and the modification time last read,
     /// so a poll costs a stat and a rewrite is read once.
     saved_variables: HashMap<PathBuf, SystemTime>,
+    /// A failed file's identity and reason, never a position-derived label.
+    /// A later store error takes precedence until another file fails.
+    saved_variables_error: Option<(PathBuf, String)>,
+    /// The diagnostic last published, to notice a renumbering on idle polls.
+    published_error: Option<String>,
 }
 
 impl<B: Backend> Worker<B> {
@@ -717,16 +724,15 @@ impl<B: Backend> Worker<B> {
     /// Read every account's SavedVariables that changed since last time
     /// into the store: the players into `affiliations/`, the NPC
     /// classifications into `creatures.tsv` (one rewrite for every account
-    /// read). `true` when an affiliation was merged — the creatures move
-    /// nothing `Status` reports.
+    /// read). `true` when an affiliation was merged or the published error
+    /// needs to change — the creatures move nothing `Status` reports.
     fn poll_saved_variables(&mut self) -> bool {
         let Some(product) = self.product.clone() else {
             return false;
         };
         let mut merged = 0usize;
         let mut seen: Vec<Creature> = Vec::new();
-        for (position, (account, path)) in addon::saved_variables(&product).into_iter().enumerate()
-        {
+        for (account, path) in addon::saved_variables(&product) {
             let Ok(modified) = std::fs::metadata(&path).and_then(|m| m.modified()) else {
                 continue;
             };
@@ -736,17 +742,11 @@ impl<B: Backend> Worker<B> {
             // Remember the time even when the read fails: a torn file is
             // reread when it changes again, not thirty times a night.
             self.saved_variables.insert(path.clone(), modified);
-            // Replace only the account component in published diagnostics;
-            // the real folder name still identifies affiliation records.
-            let display_path = product
-                .join("WTF/Account")
-                .join(addon::saved_variables_label(position))
-                .join("SavedVariables")
-                .join(format!("{}.lua", addon::NAME));
             let text = match std::fs::read_to_string(&path) {
                 Ok(t) => t,
                 Err(e) => {
-                    self.store.last_error = Some(format!("{}: {e}", display_path.display()));
+                    self.saved_variables_error = Some((path, e.to_string()));
+                    self.store.last_error = None;
                     continue;
                 }
             };
@@ -759,14 +759,37 @@ impl<B: Backend> Worker<B> {
                 }
                 Ok(None) => {}
                 Err(e) => {
-                    self.store.last_error = Some(format!("{}: {e}", display_path.display()));
+                    self.saved_variables_error = Some((path, e.to_string()));
+                    self.store.last_error = None;
                 }
             }
         }
         if !seen.is_empty() {
             self.store.merge_creatures(seen);
         }
-        merged > 0
+        merged > 0 || self.error() != self.published_error
+    }
+
+    /// Render a retained failure against discovery now, including on a
+    /// publication unrelated to the SavedVariables poll. Never reuse an old
+    /// number or fall back to the original folder when its file is gone.
+    fn error(&self) -> Option<String> {
+        if let Some(error) = &self.store.last_error {
+            return Some(error.clone());
+        }
+        let (path, reason) = self.saved_variables_error.as_ref()?;
+        let product = self.product.as_ref()?;
+        let label = addon::saved_variables(product)
+            .iter()
+            .position(|(_, current)| current == path)
+            .map(addon::saved_variables_label)
+            .unwrap_or_else(|| "account unavailable".to_string());
+        let display_path = product
+            .join("WTF/Account")
+            .join(label)
+            .join("SavedVariables")
+            .join(format!("{}.lua", addon::NAME));
+        Some(format!("{}: {reason}", display_path.display()))
     }
 
     fn handle(&mut self, req: HistoryReq) {
@@ -1038,14 +1061,15 @@ impl<B: Backend> Worker<B> {
         let _ = self.hub.send(HubMsg::HistoryChanged { fight_id });
     }
 
-    fn publish(&self, status: &Arc<Mutex<HistoryStatus>>) {
+    fn publish(&mut self, status: &Arc<Mutex<HistoryStatus>>) {
         // One resolution of the owner serves both: it walks every card.
         let (store, mine) = self.store.status_and_mine();
         if let Ok(mut s) = status.lock() {
             s.enabled = true;
             s.fights = store.fights;
             s.owner_inferred = store.owner_inferred;
-            s.error = store.error;
+            s.error = self.error();
+            self.published_error = s.error.clone();
             s.addon = self.addon.clone();
             s.affiliations = store.affiliations;
             s.affiliations_utc_ms = store.affiliations_utc_ms;
@@ -5981,4 +6005,177 @@ fn cap_taken(mut spells: Vec<Row>) -> (Vec<Row>, TakenOther) {
 pub(crate) fn name_matches(wanted: &[String], name: &str, edition: Edition) -> bool {
     let label = wowdps_model::names::Label::player(name, edition);
     wanted.iter().any(|w| label.is_called(w))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct SavedVariablesTest {
+        product: PathBuf,
+        worker: Worker<MemBackend>,
+        status: Arc<Mutex<HistoryStatus>>,
+    }
+
+    impl SavedVariablesTest {
+        fn new(tag: &str, data: &[u8]) -> Self {
+            let product = std::env::temp_dir()
+                .join(format!("wowdps-sv-lifecycle-{tag}-{}", std::process::id()));
+            let _ = std::fs::remove_dir_all(&product);
+            let path = product.join("WTF/Account/ZED/SavedVariables/wowdps.lua");
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(&path, data).unwrap();
+            let (loader, _) = std::sync::mpsc::channel();
+            let (hub, _) = std::sync::mpsc::channel();
+            let mut worker = Worker {
+                store: Store::open(MemBackend::new(), Retention::default()),
+                loader,
+                reply: HistoryLink::disabled("test"),
+                hub,
+                cache: None,
+                queue: VecDeque::new(),
+                queued: HashSet::new(),
+                inflight: false,
+                logs: HashMap::new(),
+                manifest: None,
+                reading: HashMap::new(),
+                load_failures: 0,
+                sources: Vec::new(),
+                own: false,
+                scans: VecDeque::new(),
+                backfill: VecDeque::new(),
+                product: Some(product.clone()),
+                addon: None,
+                saved_variables: HashMap::new(),
+                saved_variables_error: None,
+                published_error: None,
+            };
+            let status = Arc::new(Mutex::new(HistoryStatus::default()));
+            worker.poll_saved_variables();
+            worker.publish(&status);
+            Self {
+                product,
+                worker,
+                status,
+            }
+        }
+
+        fn error(&self, label: &str, reason: &str) -> String {
+            let error = self.status.lock().unwrap().error.clone().unwrap();
+            let display = self
+                .product
+                .join("WTF/Account")
+                .join(label)
+                .join("SavedVariables/wowdps.lua");
+            assert!(
+                error.starts_with(&format!("{}: ", display.display())),
+                "{error}"
+            );
+            assert!(error.contains(reason), "{error}");
+            assert!(
+                !error.contains("ALPHA") && !error.contains("ZED"),
+                "{error}"
+            );
+            error
+        }
+
+        fn poll(&mut self) -> bool {
+            let changed = self.worker.poll_saved_variables();
+            // The idle loop publishes only when the poll reports a change.
+            if changed {
+                self.worker.publish(&self.status);
+            }
+            changed
+        }
+    }
+
+    impl Drop for SavedVariablesTest {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.product);
+        }
+    }
+
+    fn retained_error_follows_current_account_order(tag: &str, data: &[u8], reason: &str) {
+        let mut test = SavedVariablesTest::new(tag, data);
+        let original = test.error("account 1", reason);
+        assert!(!test.poll(), "unchanged diagnostic needs no publication");
+        let zed = test
+            .product
+            .join("WTF/Account/ZED/SavedVariables/wowdps.lua");
+        let modified = std::fs::metadata(&zed).unwrap().modified().unwrap();
+        let alpha = test
+            .product
+            .join("WTF/Account/ALPHA/SavedVariables/wowdps.lua");
+        std::fs::create_dir_all(alpha.parent().unwrap()).unwrap();
+        std::fs::write(&alpha, b"WOWDPS_DATA = {}").unwrap();
+        assert!(
+            test.poll(),
+            "renumbered error must trigger publication without a merge"
+        );
+        test.error("account 2", reason);
+        assert_eq!(test.worker.store.status().affiliations, 0);
+        assert_eq!(
+            std::fs::metadata(&zed).unwrap().modified().unwrap(),
+            modified
+        );
+        assert!(!test.poll());
+        std::fs::remove_dir_all(test.product.join("WTF/Account/ALPHA")).unwrap();
+        assert!(
+            test.poll(),
+            "removing an earlier account must renumber the error"
+        );
+        assert_eq!(test.error("account 1", reason), original);
+        std::fs::remove_dir_all(test.product.join("WTF/Account/ZED")).unwrap();
+        assert!(
+            test.poll(),
+            "a removed failing account must lose its old number"
+        );
+        test.error("account unavailable", reason);
+        assert!(!test.poll());
+    }
+
+    #[test]
+    fn retained_saved_variables_read_error_follows_current_account_order() {
+        retained_error_follows_current_account_order("read", &[0xff], "UTF-8");
+    }
+
+    #[test]
+    fn retained_saved_variables_parse_error_follows_current_account_order() {
+        let why = addon_table("WOWDPS_DATA = {").unwrap_err().to_string();
+        retained_error_follows_current_account_order("parse", b"WOWDPS_DATA = {", &why);
+    }
+
+    #[test]
+    fn retained_saved_variables_error_uses_current_order_on_unrelated_publication() {
+        let mut test = SavedVariablesTest::new("publish", &[0xff]);
+        let alpha = test
+            .product
+            .join("WTF/Account/ALPHA/SavedVariables/wowdps.lua");
+        std::fs::create_dir_all(alpha.parent().unwrap()).unwrap();
+        std::fs::write(alpha, b"WOWDPS_DATA = {}").unwrap();
+        // No poll has noticed the new file yet.
+        test.worker.publish(&test.status);
+        test.error("account 2", "UTF-8");
+        assert!(!test.poll());
+    }
+
+    #[test]
+    fn newer_store_and_saved_variables_errors_each_replace_the_previous_error() {
+        let mut test = SavedVariablesTest::new("precedence", &[0xff]);
+        test.worker.store.last_error = Some("history write failed: test".to_string());
+        assert!(test.poll());
+        assert_eq!(
+            test.status.lock().unwrap().error.as_deref(),
+            Some("history write failed: test")
+        );
+        let alpha = test
+            .product
+            .join("WTF/Account/ALPHA/SavedVariables/wowdps.lua");
+        std::fs::create_dir_all(alpha.parent().unwrap()).unwrap();
+        std::fs::write(alpha, b"WOWDPS_DATA = {").unwrap();
+        assert!(test.poll());
+        let why = addon_table("WOWDPS_DATA = {").unwrap_err().to_string();
+        test.error("account 1", &why);
+        assert!(!test.poll());
+    }
 }

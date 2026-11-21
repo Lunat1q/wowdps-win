@@ -237,8 +237,10 @@ saved:   account 2: 3 players, 0 creatures, written 2026-11-02
 ```
 
 SavedVariables read or parse errors in daemon status use the same `account N`
-in place of the account-folder component, keeping the rest of the path and
-the error description.
+from the current sorted list in place of the account-folder component, keeping
+the rest of the path and the error description. Retained errors update on the
+daemon's idle poll even without new records; if their file is no longer listed,
+they use `account unavailable`.
 
 ### Game data caches
 

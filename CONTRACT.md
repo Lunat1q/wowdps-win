@@ -1534,8 +1534,11 @@ call, once. `wowdps addon` reports both, plus each account's SavedVariables, lab
 there is only one account. `daemon::addon::saved_variables_label(position: usize) -> String`
 defines that label from the zero-based position in `addon::saved_variables`.
 SavedVariables read and parse errors replace only the account-folder component of
-the displayed path with the same label before publishing history status; the rest
-of the path and the error description remain. Folder names still identify files
+the displayed path with the same label from the current sorted list whenever
+history status is published. An idle poll publishes a changed label even without
+merged records. A retained error whose file is no longer in that list uses
+`account unavailable`; the rest of the path and the error description remain.
+Folder names still identify files
 and affiliation records as data. (v49) The addon
 is the first source's product's alone: the daemon checks, rewrites and reads that one copy, so
 an edition followed beside it (an install's Forever beside Retail) has its copy never kept
