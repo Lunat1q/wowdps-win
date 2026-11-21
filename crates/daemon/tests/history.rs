@@ -4610,6 +4610,77 @@ WOWDPS_DATA = {\r\n\
 \t},\r\n\
 }\r\n";
 
+fn saved_variables_error(tag: &str, data: &[u8]) -> (String, PathBuf) {
+    let tmp = Temp::new(tag);
+    let product = fake_install(&tmp, "WOWDPS_DATA = {}");
+    // TEST is first and valid; ZED is second and fails. Both must keep
+    // their positions even though the first file produced no records.
+    let path = product.join("WTF/Account/ZED/SavedVariables/wowdps.lua");
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    std::fs::write(&path, data).unwrap();
+    let mut opts = options(
+        &tmp,
+        SourceSpec::Dir(product.join("Logs")),
+        tmp.join("history"),
+    );
+    opts.history.as_mut().unwrap().addon_dir = Some(product);
+    let d = start(opts);
+    let stream = UnixStream::connect(&d.socket).unwrap();
+    let mut client = DaemonClient::over(stream, ClientKind::Mcp).unwrap();
+    let deadline = Instant::now() + DEADLINE;
+    let error = loop {
+        client.send(&ClientMsg::GetStatus { req_id: 1 });
+        if let Some(error) = client.poll().into_iter().find_map(|msg| match msg {
+            DaemonMsg::Status { history, .. } => history.error,
+            _ => None,
+        }) {
+            break error;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "SavedVariables error never published"
+        );
+        thread::sleep(Duration::from_millis(10));
+    };
+    stop(d);
+    (error, path)
+}
+
+#[test]
+fn saved_variables_parse_errors_publish_account_number_and_file_context() {
+    let (error, path) = saved_variables_error("sv-parse-label", b"WOWDPS_DATA = {");
+    let display = path
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .with_file_name("account 2")
+        .join("SavedVariables/wowdps.lua");
+    let why = wowdps_proto::history::addon_table("WOWDPS_DATA = {").unwrap_err();
+    assert_eq!(error, format!("{}: {why}", display.display()));
+    assert!(!error.contains("ZED") && !error.contains("TEST"), "{error}");
+}
+
+#[test]
+fn saved_variables_read_errors_publish_account_number_and_os_error() {
+    // Invalid UTF-8 reliably fails read_to_string even when tests run as root.
+    let (error, path) = saved_variables_error("sv-read-label", &[0xff]);
+    let display = path
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .with_file_name("account 2")
+        .join("SavedVariables/wowdps.lua");
+    let why = String::from_utf8(vec![0xff]).unwrap_err();
+    assert!(
+        error.starts_with(&format!("{}: ", display.display())),
+        "{error}"
+    );
+    assert!(error.contains("UTF-8"), "{error}; fixture: {why}");
+    assert!(!error.contains("ZED") && !error.contains("TEST"), "{error}");
+}
+
 /// The daemon over a source inside an install: on start it rewrites the
 /// stale addon (never installs a missing one — the other test), reads
 /// every account's SavedVariables into `affiliations/`, reports both in

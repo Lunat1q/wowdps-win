@@ -155,6 +155,79 @@ fn canonical_fixture() -> String {
         .to_string()
 }
 
+fn addon_account(sb: &Sandbox, account: &str, data: &str) {
+    let product = sb.root.join("game/_retail_");
+    std::fs::create_dir_all(sb.root.join("game/Data/data")).unwrap();
+    std::fs::create_dir_all(product.join("Logs")).unwrap();
+    std::fs::write(sb.root.join("game/.build.info"), "").unwrap();
+    let dir = product
+        .join("WTF/Account")
+        .join(account)
+        .join("SavedVariables");
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("wowdps.lua");
+    std::fs::write(&path, data).unwrap();
+    std::fs::File::options()
+        .write(true)
+        .open(path)
+        .unwrap()
+        .set_times(std::fs::FileTimes::new().set_modified(std::time::UNIX_EPOCH))
+        .unwrap();
+    std::fs::write(
+        sb.root.join("config/wowdps/config.toml"),
+        format!(
+            "logs_dir = {:?}\nauto_overlay = false\n",
+            product.join("Logs")
+        ),
+    )
+    .unwrap();
+}
+
+#[test]
+fn addon_status_numbers_accounts_in_sorted_order_without_folder_names() {
+    let sb = Sandbox::new("addon-sorted");
+    // Creation order differs from folder order; counts identify each row.
+    addon_account(&sb, "ZED", "WOWDPS_DATA = {}");
+    addon_account(
+        &sb,
+        "ALPHA",
+        "WOWDPS_DATA = { [\"players\"] = { [\"Player-1-A\"] = { [\"name\"] = \"Ada\" } } }",
+    );
+    let out = sb.run(&["addon"]);
+    assert!(out.status.success(), "{}", stderr(&out));
+    let text = stdout(&out);
+    assert_eq!(
+        text.lines()
+            .filter(|l| l.starts_with("saved:"))
+            .collect::<Vec<_>>(),
+        [
+            "saved:   account 1: 1 players, 0 creatures, written 1970-01-01",
+            "saved:   account 2: 0 players, 0 creatures, written 1970-01-01",
+        ]
+    );
+    assert!(!text.contains("ALPHA") && !text.contains("ZED"), "{text}");
+    assert!(stderr(&out).is_empty());
+    assert!(!sb.socket().exists());
+}
+
+#[test]
+fn addon_status_numbers_a_single_account_as_account_one() {
+    let sb = Sandbox::new("addon-single");
+    addon_account(&sb, "LANTERN", "WOWDPS_DATA = {}");
+    let out = sb.run(&["addon", "status"]);
+    assert!(out.status.success(), "{}", stderr(&out));
+    let text = stdout(&out);
+    assert_eq!(
+        text.lines()
+            .filter(|l| l.starts_with("saved:"))
+            .collect::<Vec<_>>(),
+        ["saved:   account 1: 0 players, 0 creatures, written 1970-01-01"]
+    );
+    assert!(!text.contains("LANTERN"), "{text}");
+    assert!(stderr(&out).is_empty());
+    assert!(!sb.socket().exists());
+}
+
 #[test]
 fn help_prints_the_usage_and_exits_clean() {
     let sb = Sandbox::new("help");
