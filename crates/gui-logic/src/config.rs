@@ -638,7 +638,7 @@ mod tests {
     use super::*;
 
     fn temp_path(tag: &str) -> PathBuf {
-        std::env::temp_dir().join(format!("wowdps-config-{tag}-{}", std::process::id()))
+        crate::test_scratch::root().join(format!("wowdps-config-{tag}-{}", std::process::id()))
     }
 
     #[test]
@@ -975,7 +975,8 @@ mod passthrough {
     /// the whole file from this struct and erase them.
     #[test]
     fn a_save_preserves_keys_the_gui_does_not_own() {
-        let dir = std::env::temp_dir().join(format!("wowdps-config-extra-{}", std::process::id()));
+        let dir =
+            crate::test_scratch::root().join(format!("wowdps-config-extra-{}", std::process::id()));
         let path = dir.join("wowdps").join("config.toml");
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         std::fs::write(
@@ -1001,7 +1002,8 @@ mod passthrough {
     /// defaults — that would erase every key the GUI does not own.
     #[test]
     fn a_file_that_failed_to_parse_is_never_saved_over() {
-        let dir = std::env::temp_dir().join(format!("wowdps-config-broken-{}", std::process::id()));
+        let dir = crate::test_scratch::root()
+            .join(format!("wowdps-config-broken-{}", std::process::id()));
         let path = dir.join("wowdps").join("config.toml");
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         let text = "logs_dir = \"/a\"\nlogs_dir = \"/b\"\nhistory_characters = [\"Me\"]\n";
@@ -1161,8 +1163,8 @@ mod passthrough {
     /// it is on disk.
     #[test]
     fn an_edition_s_table_round_trips_and_stores_alone() {
-        let dir =
-            std::env::temp_dir().join(format!("wowdps-config-editions-{}", std::process::id()));
+        let dir = crate::test_scratch::root()
+            .join(format!("wowdps-config-editions-{}", std::process::id()));
         let path = dir.join("config.toml");
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::write(

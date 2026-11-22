@@ -895,6 +895,30 @@ mod tests {
     /// no Forever folder, or a config of full names, says nothing.
     #[test]
     fn a_one_word_character_is_named_once_at_start_by_position() {
+        // Production options create a runtime directory. Run this case alone
+        // with owned paths instead of mutating the test process's environment.
+        const TEST: &str = "tests::a_one_word_character_is_named_once_at_start_by_position";
+        if std::env::var("WOWDPS_OPTIONS_TEST").as_deref() != Ok(TEST) {
+            let dir = crate::test_scratch::Dir::new_in(&crate::test_scratch::root());
+            let mut child = std::process::Command::new(std::env::current_exe().unwrap());
+            child
+                .args(["--exact", TEST])
+                .env("WOWDPS_OPTIONS_TEST", TEST);
+            for (variable, folder) in [
+                ("XDG_RUNTIME_DIR", "rt"),
+                ("XDG_CONFIG_HOME", "config"),
+                ("XDG_CACHE_HOME", "cache"),
+                ("XDG_DATA_HOME", "data"),
+                ("HOME", "home"),
+            ] {
+                let path = dir.path().join(folder);
+                std::fs::create_dir(&path).unwrap();
+                child.env(variable, path);
+            }
+            let output = child.output().unwrap();
+            assert!(output.status.success(), "{output:?}");
+            return;
+        }
         use std::path::PathBuf;
         use wowdps_core::cli::SourceSpec;
         let cfg = wowdps_daemon::config::Config::default();
@@ -924,3 +948,7 @@ mod tests {
         assert_eq!(unnamed_forever_characters(&chars(&["Ada"]), &opts), None);
     }
 }
+
+#[cfg(test)]
+#[path = "../../test-support/scratch.rs"]
+mod test_scratch;

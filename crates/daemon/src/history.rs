@@ -6019,7 +6019,7 @@ mod tests {
 
     impl SavedVariablesTest {
         fn new(tag: &str, data: &[u8]) -> Self {
-            let product = std::env::temp_dir()
+            let product = crate::test_scratch::root()
                 .join(format!("wowdps-sv-lifecycle-{tag}-{}", std::process::id()));
             let _ = std::fs::remove_dir_all(&product);
             let path = product.join("WTF/Account/ZED/SavedVariables/wowdps.lua");

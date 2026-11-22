@@ -1308,7 +1308,8 @@ mod tests {
             None => unsafe { std::env::remove_var("HOME") },
         }
 
-        let dir = std::env::temp_dir().join(format!("wowdps-talents-{}", std::process::id()));
+        let dir =
+            crate::test_scratch::root().join(format!("wowdps-talents-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let file = dir.join("talents.json");
         unsafe { std::env::set_var("WOWDPS_TALENTS", &file) };

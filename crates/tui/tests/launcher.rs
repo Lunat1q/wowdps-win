@@ -31,14 +31,23 @@ const DEADLINE: Duration = Duration::from_secs(15);
 
 /// One isolated home for one test: runtime dir (socket + lock), state dir
 /// (daemon.log), cache, config, a `bin` dir that is the whole `$PATH`.
+static SANDBOX_SERIAL: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 struct Sandbox {
     root: PathBuf,
+    _serial: std::sync::MutexGuard<'static, ()>,
 }
 
 impl Sandbox {
     fn new(tag: &str) -> Self {
+        // A subreaper owns orphaned descendants process-wide. Serialize all
+        // subprocess sandboxes so teardown cannot reap another test's child.
+        let serial = SANDBOX_SERIAL.lock().unwrap_or_else(|e| e.into_inner());
+        #[cfg(target_os = "linux")]
+        child_processes::enable();
         // Short: the socket path must fit a sockaddr_un.
-        let root = std::env::temp_dir().join(format!("wdt-{tag}-{}", std::process::id()));
+        let root =
+            crate::test_scratch::short_root().join(format!("wdt-{tag}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         for sub in ["rt", "state", "cache", "config/wowdps", "home", "bin"] {
             std::fs::create_dir_all(root.join(sub)).unwrap();
@@ -50,7 +59,10 @@ impl Sandbox {
             "auto_overlay = false\ngame_process = \"wowdps-test-no-such-process\"\n",
         )
         .unwrap();
-        Sandbox { root }
+        Sandbox {
+            root,
+            _serial: serial,
+        }
     }
 
     fn bin_dir(&self) -> PathBuf {
@@ -136,6 +148,8 @@ impl Sandbox {
 
 impl Drop for Sandbox {
     fn drop(&mut self) {
+        #[cfg(target_os = "linux")]
+        child_processes::finish(&self.socket());
         let _ = std::fs::remove_dir_all(&self.root);
     }
 }
@@ -439,6 +453,10 @@ fn the_foreground_daemon_serves_status_refuses_a_twin_and_stops_clean() {
         .stderr(Stdio::piped())
         .spawn()
         .expect("spawn daemon");
+    let daemon_guard = ForegroundDaemon {
+        child: &mut daemon,
+        socket: sb.socket(),
+    };
     sb.wait_socket(true);
 
     let out = sb.run(&["status"]);
@@ -500,7 +518,7 @@ fn the_foreground_daemon_serves_status_refuses_a_twin_and_stops_clean() {
         "{}",
         stdout(&out)
     );
-    let status = daemon.wait().expect("daemon exits");
+    let status = daemon_guard.child.wait().expect("daemon exits");
     assert!(status.success(), "daemon exit: {status:?}");
     sb.wait_socket(false);
     let log = sb.daemon_log();
@@ -516,6 +534,7 @@ fn the_foreground_daemon_serves_status_refuses_a_twin_and_stops_clean() {
 /// and stdin is /dev/null) — the error path every headless launch takes.
 /// The daemon it spawned is real, idle-exits on its own, and is stopped here
 /// explicitly anyway.
+#[cfg(target_os = "linux")]
 #[test]
 fn the_tui_client_spawns_the_daemon_then_reports_a_missing_terminal() {
     let sb = Sandbox::new("tui");
@@ -550,4 +569,168 @@ fn the_tui_client_spawns_the_daemon_then_reports_a_missing_terminal() {
     assert!(out.status.success());
     sb.wait_socket(false);
     sb.wait_log_contains("clean exit");
+}
+
+#[path = "../../test-support/scratch.rs"]
+mod test_scratch;
+
+#[cfg(target_os = "linux")]
+mod child_processes {
+    use std::collections::BTreeSet;
+    unsafe extern "C" {
+        fn prctl(option: i32, ...) -> i32;
+        fn waitpid(pid: i32, status: *mut i32, options: i32) -> i32;
+        fn kill(pid: i32, signal: i32) -> i32;
+    }
+    pub fn enable() {
+        static INIT: std::sync::Once = std::sync::Once::new();
+        INIT.call_once(|| {
+            // SAFETY: PR_SET_CHILD_SUBREAPER changes only this test process.
+            assert_eq!(unsafe { prctl(36, 1usize, 0usize, 0usize, 0usize) }, 0);
+        });
+    }
+    pub fn children() -> BTreeSet<i32> {
+        std::fs::read_dir("/proc/self/task")
+            .unwrap()
+            .flatten()
+            .filter_map(|t| std::fs::read_to_string(t.path().join("children")).ok())
+            .flat_map(|s| {
+                s.split_whitespace()
+                    .filter_map(|p| p.parse().ok())
+                    .collect::<Vec<i32>>()
+            })
+            .collect()
+    }
+    pub fn finish(socket: &std::path::Path) {
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+        loop {
+            for pid in children() {
+                let _ = reaped(pid);
+            }
+            if children().is_empty() {
+                return;
+            }
+            super::shutdown(socket);
+            if std::time::Instant::now() >= deadline {
+                for pid in children() {
+                    if !reaped(pid) {
+                        kill_and_wait(pid);
+                    }
+                }
+            } else {
+                std::thread::sleep(std::time::Duration::from_millis(5));
+            }
+        }
+    }
+    pub fn reaped(pid: i32) -> bool {
+        let mut status = 0;
+        // SAFETY: pid was obtained from our own Child or adopted children.
+        let result = unsafe { waitpid(pid, &mut status, 1) };
+        result == pid
+            || (result == -1 && std::io::Error::last_os_error().raw_os_error() == Some(10))
+    }
+    pub fn kill_and_wait(pid: i32) {
+        // SAFETY: this still-unreaped process is our own child. Its pid cannot
+        // be reused until waitpid reaps it; sandbox spawning is serialized.
+        unsafe {
+            kill(pid, 9);
+        }
+        let mut status = 0;
+        while unsafe { waitpid(pid, &mut status, 0) } == -1 {
+            if std::io::Error::last_os_error().raw_os_error() != Some(4) {
+                break;
+            }
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn panic_after_daemon_spawn(detached: bool) {
+    let mut pid = 0;
+    let mut root = None;
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let sb = Sandbox::new(if detached { "panic-tui" } else { "panic-fg" });
+        root = Some(sb.root.clone());
+        if detached {
+            let setsid = host_tool("setsid").expect("setsid for detached-client test");
+            let out = sb
+                .command(setsid.to_str().unwrap())
+                .args(["--wait", BIN, "--file", FIXTURE])
+                .output()
+                .unwrap();
+            assert_eq!(out.status.code(), Some(1));
+            let children = child_processes::children();
+            assert_eq!(children.len(), 1, "one adopted daemon");
+            pid = *children.first().unwrap();
+        } else {
+            let child = sb
+                .wowdps(&["daemon", "--linger", "--file", FIXTURE])
+                .spawn()
+                .unwrap();
+            pid = child.id() as i32;
+            drop(child);
+        }
+        sb.wait_socket(true);
+        panic!("test assertion after daemon startup");
+    }));
+    assert!(result.is_err());
+    assert!(pid > 0);
+    let waited = child_processes::reaped(pid);
+    if !waited {
+        child_processes::kill_and_wait(pid);
+    }
+    let root = root.unwrap();
+    let removed = !root.exists();
+    if !removed {
+        let _ = std::fs::remove_dir_all(&root);
+    }
+    assert!(waited, "unwinding must stop and reap the owned daemon");
+    assert!(
+        removed,
+        "scratch is removed only after the daemon is reaped"
+    );
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn foreground_daemon_is_waited_for_when_a_test_panics() {
+    panic_after_daemon_spawn(false);
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn self_spawned_daemon_is_waited_for_when_a_test_panics() {
+    panic_after_daemon_spawn(true);
+}
+
+fn shutdown(socket: &Path) {
+    if let Ok(mut stream) = std::os::unix::net::UnixStream::connect(socket) {
+        let _ = stream.set_write_timeout(Some(Duration::from_secs(1)));
+        let _ = stream.write_all(&ClientMsg::Shutdown.encode());
+    }
+}
+
+/// Borrowing keeps the exact Child available for its normal wait while Drop
+/// also covers readiness/assertion failures on every Unix platform.
+struct ForegroundDaemon<'a> {
+    child: &'a mut std::process::Child,
+    socket: PathBuf,
+}
+
+impl Drop for ForegroundDaemon<'_> {
+    fn drop(&mut self) {
+        let deadline = Instant::now() + Duration::from_secs(2);
+        loop {
+            if self.child.try_wait().ok().flatten().is_some() {
+                return;
+            }
+            shutdown(&self.socket);
+            if Instant::now() >= deadline {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        let _ = self.child.kill();
+        let _ = self.child.wait();
+    }
 }

@@ -319,8 +319,8 @@ mod tests {
     const H_OLD: &str = "00000000000000000000000000000000";
 
     fn scratch(name: &str) -> PathBuf {
-        let dir =
-            std::env::temp_dir().join(format!("wowdps-emblems-{name}-{}", std::process::id()));
+        let dir = crate::test_scratch::root()
+            .join(format!("wowdps-emblems-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).expect("the scratch dir");
         dir

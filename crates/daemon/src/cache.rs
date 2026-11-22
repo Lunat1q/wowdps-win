@@ -430,7 +430,8 @@ mod tests {
     struct Temp(PathBuf);
     impl Temp {
         fn new(tag: &str) -> Self {
-            let p = std::env::temp_dir().join(format!("wowdps-cache-{tag}-{}", std::process::id()));
+            let p = crate::test_scratch::root()
+                .join(format!("wowdps-cache-{tag}-{}", std::process::id()));
             let _ = std::fs::remove_dir_all(&p);
             std::fs::create_dir_all(&p).unwrap();
             Temp(p)

@@ -396,7 +396,7 @@ mod tests {
     impl TempDir {
         fn new(tag: &str) -> Self {
             static N: AtomicU32 = AtomicU32::new(0);
-            let mut p = std::env::temp_dir();
+            let mut p = crate::test_scratch::root();
             p.push(format!(
                 "wowdps-{tag}-{}-{}",
                 std::process::id(),

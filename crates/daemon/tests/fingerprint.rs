@@ -24,7 +24,7 @@ impl Temp {
     fn new(tag: &str) -> Self {
         static N: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
         let n = N.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        let p = std::env::temp_dir().join(format!(
+        let p = crate::test_scratch::root().join(format!(
             "wowdps-fingerprint-{tag}-{}-{n}",
             std::process::id()
         ));
@@ -265,3 +265,6 @@ fn the_fingerprint_is_the_names_and_the_text() {
     );
     assert_ne!(print(&a.0, &units), base, "production code changed");
 }
+
+#[path = "../../test-support/scratch.rs"]
+mod test_scratch;

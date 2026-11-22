@@ -32,7 +32,7 @@ pub(crate) fn own_config() -> std::path::PathBuf {
         c.set(c.get() + 1);
         c.get()
     });
-    let dir = std::env::temp_dir().join(format!(
+    let dir = wowdps_gui_logic::test_scratch::root().join(format!(
         "wowdps-gui-window-{}-{:?}-{n}",
         std::process::id(),
         std::thread::current().id()

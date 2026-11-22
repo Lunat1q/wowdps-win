@@ -30,7 +30,7 @@ const DEADLINE: Duration = Duration::from_secs(15);
 fn sandbox() -> PathBuf {
     static ROOT: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
     ROOT.get_or_init(|| {
-        let root = std::env::temp_dir().join(format!("wdp-{}", std::process::id()));
+        let root = crate::test_scratch::short_root().join(format!("wdp-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         for sub in ["rt", "cache", "home", "data"] {
             std::fs::create_dir_all(root.join(sub)).unwrap();
@@ -53,6 +53,11 @@ static LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 #[test]
 fn the_source_comes_from_the_override_the_config_or_nowhere() {
+    if crate::test_scratch::process::isolate(
+        "the_source_comes_from_the_override_the_config_or_nowhere",
+    ) {
+        return;
+    }
     let _guard = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let root = sandbox();
 
@@ -157,6 +162,9 @@ impl Drop for WowDir {
 /// does not exist yet. `--logs` is one source whatever it names.
 #[test]
 fn an_install_is_followed_edition_by_edition() {
+    if crate::test_scratch::process::isolate("an_install_is_followed_edition_by_edition") {
+        return;
+    }
     let _guard = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let root = sandbox();
     let wow = root.join("home/Games/World of Warcraft");
@@ -334,6 +342,10 @@ fn checkpoints(cache: &Path) -> usize {
 /// and Forever's one is never evicted by them.
 #[test]
 fn a_default_daemon_follows_both_editions_of_an_install() {
+    if crate::test_scratch::process::isolate("a_default_daemon_follows_both_editions_of_an_install")
+    {
+        return;
+    }
     let _guard = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let root = sandbox();
     let wow = root.join("home/Both/World of Warcraft");
@@ -432,6 +444,9 @@ fn a_default_daemon_follows_both_editions_of_an_install() {
 /// stored with no restart.
 #[test]
 fn forevers_folder_is_followed_from_its_first_log() {
+    if crate::test_scratch::process::isolate("forevers_folder_is_followed_from_its_first_log") {
+        return;
+    }
     let _guard = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let root = sandbox();
     let wow = root.join("home/Later/World of Warcraft");
@@ -492,6 +507,11 @@ fn forevers_folder_is_followed_from_its_first_log() {
 /// spawner that can never be asked to spawn — answers status and stops.
 #[test]
 fn a_production_daemon_runs_with_the_cache_and_watcher_wired() {
+    if crate::test_scratch::process::isolate(
+        "a_production_daemon_runs_with_the_cache_and_watcher_wired",
+    ) {
+        return;
+    }
     let _guard = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let root = sandbox();
     let cfg = Config {
@@ -607,6 +627,11 @@ fn stored_by(
 /// config names is the install's own: each card is its writer's.
 #[test]
 fn a_typed_log_names_no_owner_and_the_install_s_folder_does() {
+    if crate::test_scratch::process::isolate(
+        "a_typed_log_names_no_owner_and_the_install_s_folder_does",
+    ) {
+        return;
+    }
     let _guard = LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let root = sandbox();
     let cfg = Config {
@@ -672,3 +697,6 @@ fn a_typed_log_names_no_owner_and_the_install_s_folder_does() {
     let _ = std::fs::remove_dir_all(root.join("typed"));
     let _ = std::fs::remove_dir_all(root.join("own"));
 }
+
+#[path = "../../test-support/scratch.rs"]
+mod test_scratch;

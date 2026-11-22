@@ -324,8 +324,8 @@ mod tests {
 
     impl Store {
         fn new(tag: &str) -> Store {
-            let dir =
-                std::env::temp_dir().join(format!("wowdps-pulls-{tag}-{}", std::process::id()));
+            let dir = crate::test_scratch::root()
+                .join(format!("wowdps-pulls-{tag}-{}", std::process::id()));
             let _ = std::fs::remove_dir_all(&dir);
             std::fs::create_dir_all(dir.join("fights")).unwrap();
             std::fs::create_dir_all(dir.join("replay")).unwrap();

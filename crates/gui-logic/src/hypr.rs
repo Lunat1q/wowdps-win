@@ -697,13 +697,7 @@ Window 6024184fbab0 -> Ghostty:
     /// A test that must leave the environment alone (the GUI's, beside
     /// others in threads) puts its [`FakeHypr::at`] under this.
     pub fn scratch_root() -> PathBuf {
-        let base = std::env::temp_dir();
-        let base = if base.as_os_str().len() > 40 {
-            PathBuf::from("/tmp")
-        } else {
-            base
-        };
-        base.join(format!("wowdps-gui-{}", std::process::id()))
+        crate::test_scratch::short_root()
     }
 
     /// Where [`super::socket_dir`] resolves to under [`test_env`].

@@ -48,3 +48,8 @@ pub mod theme;
 pub mod timeline;
 pub mod toast;
 pub mod tree;
+
+#[cfg(any(test, feature = "test-support"))]
+#[path = "../../test-support/scratch.rs"]
+#[doc(hidden)]
+pub mod test_scratch;

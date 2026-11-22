@@ -52,7 +52,8 @@ impl Temp {
         // would wipe the first one's log out from under it mid-read.
         static N: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
         let n = N.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        let p = std::env::temp_dir().join(format!("wowdps-hist-{tag}-{}-{n}", std::process::id()));
+        let p = crate::test_scratch::short_root()
+            .join(format!("wowdps-hist-{tag}-{}-{n}", std::process::id()));
         let _ = std::fs::remove_dir_all(&p);
         std::fs::create_dir_all(&p).unwrap();
         Temp(p)
@@ -64,7 +65,7 @@ impl Temp {
 
 impl Drop for Temp {
     fn drop(&mut self) {
-        let _ = std::fs::remove_dir_all(&self.0);
+        crate::test_scratch::remove_when_quiet(&self.0);
     }
 }
 
@@ -120,6 +121,9 @@ fn names(store: &Store<MemBackend>, dir: &str) -> Vec<String> {
 
 #[test]
 fn sample_closes_two_encounters_and_the_raid_overall() {
+    if crate::test_scratch::process::isolate("sample_closes_two_encounters_and_the_raid_overall") {
+        return;
+    }
     let path = Path::new(SAMPLE);
     let fights = closed_fights(path);
     let mut store = mem(Retention::default());
@@ -232,6 +236,11 @@ fn sample_closes_two_encounters_and_the_raid_overall() {
 /// its roles being its specs'.
 #[test]
 fn a_forever_card_stores_its_inferred_roles_and_a_retail_card_none() {
+    if crate::test_scratch::process::isolate(
+        "a_forever_card_stores_its_inferred_roles_and_a_retail_card_none",
+    ) {
+        return;
+    }
     use wowdps_core::model::Role;
     let path = Path::new(ROLES);
     let fights = closed_fights(path);
@@ -295,6 +304,9 @@ fn a_forever_card_stores_its_inferred_roles_and_a_retail_card_none() {
 
 #[test]
 fn trash_is_stored_only_under_the_switch() {
+    if crate::test_scratch::process::isolate("trash_is_stored_only_under_the_switch") {
+        return;
+    }
     let path = Path::new(SAMPLE);
     let fights = closed_fights(path);
     let mut with = mem(Retention {
@@ -314,6 +326,9 @@ fn trash_is_stored_only_under_the_switch() {
 
 #[test]
 fn a_second_replay_writes_nothing() {
+    if crate::test_scratch::process::isolate("a_second_replay_writes_nothing") {
+        return;
+    }
     let path = Path::new(SAMPLE);
     let fights = closed_fights(path);
     let mut store = mem(Retention::default());
@@ -345,6 +360,9 @@ fn a_second_replay_writes_nothing() {
 
 #[test]
 fn a_crlf_copy_of_the_log_has_the_same_identity() {
+    if crate::test_scratch::process::isolate("a_crlf_copy_of_the_log_has_the_same_identity") {
+        return;
+    }
     let tmp = Temp::new("crlf");
     let text = std::fs::read_to_string(SAMPLE).unwrap();
     let copy = tmp.join("WoWCombatLog-copy.txt");
@@ -368,6 +386,9 @@ fn a_crlf_copy_of_the_log_has_the_same_identity() {
 
 #[test]
 fn a_half_written_first_line_is_not_an_identity_yet() {
+    if crate::test_scratch::process::isolate("a_half_written_first_line_is_not_an_identity_yet") {
+        return;
+    }
     let tmp = Temp::new("halfline");
     let p = tmp.join("WoWCombatLog-x.txt");
     std::fs::write(&p, "7/27/2026 20:00:00.000-4  COMBAT_LOG_VER").unwrap();
@@ -384,6 +405,11 @@ fn a_half_written_first_line_is_not_an_identity_yet() {
 
 #[test]
 fn instance_fixture_stores_the_keyed_overall_not_its_members() {
+    if crate::test_scratch::process::isolate(
+        "instance_fixture_stores_the_keyed_overall_not_its_members",
+    ) {
+        return;
+    }
     let path = Path::new(INSTANCE);
     let fights = closed_fights(path);
     let mut store = mem(Retention::default());
@@ -444,6 +470,11 @@ fn instance_fixture_stores_the_keyed_overall_not_its_members() {
 
 #[test]
 fn arena_fixture_stores_matches_with_their_verdicts_and_enemy_rows() {
+    if crate::test_scratch::process::isolate(
+        "arena_fixture_stores_matches_with_their_verdicts_and_enemy_rows",
+    ) {
+        return;
+    }
     let path = Path::new(ARENA);
     let fights = closed_fights(path);
     let mut store = mem(Retention::default());
@@ -470,6 +501,9 @@ fn arena_fixture_stores_matches_with_their_verdicts_and_enemy_rows() {
 
 #[test]
 fn an_enemy_player_stores_five_zero_span_scalars() {
+    if crate::test_scratch::process::isolate("an_enemy_player_stores_five_zero_span_scalars") {
+        return;
+    }
     // Review S1 (v25): `uptime[]` / `coarse[]` are friendly-only, so the
     // card's five span scalars are too — an arena's enemy healer stores
     // zeros even when the engine saw its external, and Σ uptime.total_ms
@@ -609,6 +643,11 @@ fn an_enemy_player_stores_five_zero_span_scalars() {
 
 #[test]
 fn corrupt_cards_are_skipped_and_reported_and_the_rest_served() {
+    if crate::test_scratch::process::isolate(
+        "corrupt_cards_are_skipped_and_reported_and_the_rest_served",
+    ) {
+        return;
+    }
     let path = Path::new(SAMPLE);
     let fights = closed_fights(path);
     let mut store = mem(Retention::default());
@@ -643,6 +682,9 @@ fn corrupt_cards_are_skipped_and_reported_and_the_rest_served() {
 
 #[test]
 fn an_unwritable_store_fails_soft() {
+    if crate::test_scratch::process::isolate("an_unwritable_store_fails_soft") {
+        return;
+    }
     let path = Path::new(SAMPLE);
     let fights = closed_fights(path);
     let mut backend = MemBackend::new();
@@ -665,6 +707,9 @@ fn an_unwritable_store_fails_soft() {
 
 #[test]
 fn a_full_queue_drops_and_counts_instead_of_blocking() {
+    if crate::test_scratch::process::isolate("a_full_queue_drops_and_counts_instead_of_blocking") {
+        return;
+    }
     let (link, _rx) = HistoryLink::bounded(1);
     let path = Path::new(SAMPLE);
     let fights = closed_fights(path);
@@ -692,6 +737,9 @@ fn a_full_queue_drops_and_counts_instead_of_blocking() {
 /// a write the daemon dropped, which a client warns the user about.
 #[test]
 fn a_refused_import_is_answered_not_dropped() {
+    if crate::test_scratch::process::isolate("a_refused_import_is_answered_not_dropped") {
+        return;
+    }
     let (link, _rx) = HistoryLink::bounded(1);
     assert!(
         link.send(HistoryReq::Sweep(PathBuf::from("/nowhere")))
@@ -716,6 +764,9 @@ fn a_refused_import_is_answered_not_dropped() {
 /// `Store` needs are still there after a read flood.
 #[test]
 fn a_flood_of_reads_cannot_drop_a_store() {
+    if crate::test_scratch::process::isolate("a_flood_of_reads_cannot_drop_a_store") {
+        return;
+    }
     let queue = wowdps_daemon::history::QUEUE;
     let quota = queue / 2;
     let (link, rx) = HistoryLink::bounded(queue);
@@ -831,6 +882,11 @@ fn boss_store(pulls: &[(u32, bool)], cfg: Retention) -> (Store<MemBackend>, Vec<
 
 #[test]
 fn retention_evicts_oldest_first_but_never_the_protected_set() {
+    if crate::test_scratch::process::isolate(
+        "retention_evicts_oldest_first_but_never_the_protected_set",
+    ) {
+        return;
+    }
     // Six pulls of one boss: three kills and three wipes. v42: every kill is
     // kept whole, and the cap counts the wipes alone — keep 1 → the newest
     // wipe stays, the two older go.
@@ -868,6 +924,11 @@ fn retention_evicts_oldest_first_but_never_the_protected_set() {
 
 #[test]
 fn wipes_over_the_minimum_get_details_short_and_aborted_ones_do_not() {
+    if crate::test_scratch::process::isolate(
+        "wipes_over_the_minimum_get_details_short_and_aborted_ones_do_not",
+    ) {
+        return;
+    }
     // A 90 s wipe, a 60 s wipe (exactly the minimum), a 59 s wipe, a kill.
     let pulls = [(90, false), (60, false), (59, false), (30, true)];
     let tmp = Temp::new("wipe-details");
@@ -919,6 +980,9 @@ fn wipes_over_the_minimum_get_details_short_and_aborted_ones_do_not() {
 
 #[test]
 fn the_details_cap_demotes_wipes_and_never_a_kill() {
+    if crate::test_scratch::process::isolate("the_details_cap_demotes_wipes_and_never_a_kill") {
+        return;
+    }
     // Oldest kill first, then a long wipe: cap 0 → the wipe's details go
     // even though it is the NEWER file, because the kill is kept whole
     // (v42; it is the fastest too); the wipe's card and rows stay.
@@ -954,6 +1018,11 @@ fn the_details_cap_demotes_wipes_and_never_a_kill() {
 
 #[test]
 fn a_pin_protects_a_fight_and_details_are_demoted_by_unlink() {
+    if crate::test_scratch::process::isolate(
+        "a_pin_protects_a_fight_and_details_are_demoted_by_unlink",
+    ) {
+        return;
+    }
     // Long wipes: a kill is kept whole (v42) and would need no pin.
     let pulls = [(100, false), (95, false), (90, false), (85, false)];
     let tmp = Temp::new("pin");
@@ -1000,6 +1069,9 @@ fn a_pin_protects_a_fight_and_details_are_demoted_by_unlink() {
 
 #[test]
 fn an_annotation_file_protects_a_fight() {
+    if crate::test_scratch::process::isolate("an_annotation_file_protects_a_fight") {
+        return;
+    }
     let pulls = [(40, false), (30, false), (20, false)];
     let tmp = Temp::new("annot");
     let path = tmp.join("WoWCombatLog-a.txt");
@@ -1090,6 +1162,11 @@ fn store_of(cards: &[FightCard], cfg: Retention) -> Store<MemBackend> {
 /// reader would reject has to be prevented here, not there.
 #[test]
 fn a_fights_answer_is_capped_however_much_the_client_asks_for() {
+    if crate::test_scratch::process::isolate(
+        "a_fights_answer_is_capped_however_much_the_client_asks_for",
+    ) {
+        return;
+    }
     let cap = wowdps_daemon::history::FIGHTS_CAP;
     let cards: Vec<FightCard> = (0..cap as i64 + 20)
         .map(|i| card(1, 1_000 + i, &[("G-me", "Me-Realm", true)]))
@@ -1127,6 +1204,11 @@ fn a_fights_answer_is_capped_however_much_the_client_asks_for() {
 
 #[test]
 fn the_owner_is_the_guid_every_log_logged_or_the_configured_character() {
+    if crate::test_scratch::process::isolate(
+        "the_owner_is_the_guid_every_log_logged_or_the_configured_character",
+    ) {
+        return;
+    }
     let night1 = [
         card(1, 100, &[("G-me", "Me-Realm", true), ("G-a", "A", true)]),
         card(1, 200, &[("G-me", "Me-Realm", true), ("G-b", "B", true)]),
@@ -1190,6 +1272,9 @@ fn the_owner_is_the_guid_every_log_logged_or_the_configured_character() {
 
 #[test]
 fn an_inferred_owner_survives_a_log_without_them() {
+    if crate::test_scratch::process::isolate("an_inferred_owner_survives_a_log_without_them") {
+        return;
+    }
     // Two nights named the main; the cards carry the stamp the store
     // writes. A third log without them (an alt's dungeon, a friend's
     // import) empties the intersection but must not un-know the main:
@@ -1267,6 +1352,11 @@ fn owners(store: &Store<MemBackend>) -> Vec<(String, Option<String>)> {
 /// store's owner agree.
 #[test]
 fn a_retail_owner_by_the_flag_is_the_one_combatant_info_names() {
+    if crate::test_scratch::process::isolate(
+        "a_retail_owner_by_the_flag_is_the_one_combatant_info_names",
+    ) {
+        return;
+    }
     let tmp = Temp::new("flag-ci");
     let sample = std::fs::read_to_string(SAMPLE).unwrap();
     let night = sample
@@ -1308,6 +1398,10 @@ fn a_retail_owner_by_the_flag_is_the_one_combatant_info_names() {
 /// a configured character on the roster wins over the flag.
 #[test]
 fn a_forever_card_is_owned_by_the_logger_its_flags_name() {
+    if crate::test_scratch::process::isolate("a_forever_card_is_owned_by_the_logger_its_flags_name")
+    {
+        return;
+    }
     let fixture = |name: &str| {
         PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../core/fixtures")).join(name)
     };
@@ -1417,6 +1511,9 @@ fn kept(store: &Store<MemBackend>) -> Vec<(Option<String>, f64)> {
 /// lesser wipe goes.
 #[test]
 fn every_character_that_owns_cards_keeps_its_bests() {
+    if crate::test_scratch::process::isolate("every_character_that_owns_cards_keeps_its_bests") {
+        return;
+    }
     let tmp = Temp::new("two-bests");
     let mut store = mem(Retention {
         keep_per_encounter: 0,
@@ -1451,6 +1548,11 @@ fn every_character_that_owns_cards_keeps_its_bests() {
 /// the same, by its cards' own owner.
 #[test]
 fn a_forever_best_is_kept_when_only_retail_is_configured() {
+    if crate::test_scratch::process::isolate(
+        "a_forever_best_is_kept_when_only_retail_is_configured",
+    ) {
+        return;
+    }
     let tmp = Temp::new("forever-best");
     let mut store = mem(Retention {
         keep_per_encounter: 0,
@@ -1493,6 +1595,10 @@ fn a_forever_best_is_kept_when_only_retail_is_configured() {
 /// so nothing else would name its writer; a card that had none keeps none.
 #[test]
 fn a_regrade_without_the_logger_keeps_the_stamped_owner() {
+    if crate::test_scratch::process::isolate("a_regrade_without_the_logger_keeps_the_stamped_owner")
+    {
+        return;
+    }
     let tmp = Temp::new("regrade-kept");
     let path = tmp.join("WoWCombatLog-a.txt");
     std::fs::write(&path, boss_log(&[(60, false)])).unwrap();
@@ -1537,6 +1643,9 @@ fn a_regrade_without_the_logger_keeps_the_stamped_owner() {
 /// regrade keeps Ana; a trusted one finds no one.
 #[test]
 fn a_trusted_regrade_reads_the_owner_afresh() {
+    if crate::test_scratch::process::isolate("a_trusted_regrade_reads_the_owner_afresh") {
+        return;
+    }
     let tmp = Temp::new("regrade-afresh");
     let path = tmp.join("WoWCombatLog-a.txt");
     std::fs::write(&path, boss_log(&[(60, false)]).replace("0x511", "0x512")).unwrap();
@@ -1576,6 +1685,11 @@ fn a_trusted_regrade_reads_the_owner_afresh() {
 
 #[test]
 fn opening_a_store_moves_unmarked_sigma_cards_to_their_marked_ids() {
+    if crate::test_scratch::process::isolate(
+        "opening_a_store_moves_unmarked_sigma_cards_to_their_marked_ids",
+    ) {
+        return;
+    }
     // Schema-1 stores filed a visit's Σ under the pull spelling, where a
     // member starting on the visit's millisecond collides with it.
     let mut sigma = card(7, 500, &[("G-me", "Me", true)]);
@@ -1622,6 +1736,11 @@ fn opening_a_store_moves_unmarked_sigma_cards_to_their_marked_ids() {
 
 #[test]
 fn a_regrade_that_downgrades_a_kill_drops_its_stale_details() {
+    if crate::test_scratch::process::isolate(
+        "a_regrade_that_downgrades_a_kill_drops_its_stale_details",
+    ) {
+        return;
+    }
     let path = Path::new(SAMPLE);
     let fights = closed_fights(path);
     // The fixture's kill is 60 s — exactly the default wipe minimum — so
@@ -1664,6 +1783,11 @@ fn a_regrade_that_downgrades_a_kill_drops_its_stale_details() {
 /// into the file — the only way an old lake gains it — without losing its pin.
 #[test]
 fn a_regrade_stamps_role_onto_a_pre_role_card_and_keeps_its_pin() {
+    if crate::test_scratch::process::isolate(
+        "a_regrade_stamps_role_onto_a_pre_role_card_and_keeps_its_pin",
+    ) {
+        return;
+    }
     use wowdps_model::Role;
     let path = Path::new(SAMPLE);
     let fights = closed_fights(path);
@@ -1868,6 +1992,9 @@ fn count(dir: &Path, sub: &str) -> usize {
 /// restart or a regrade.
 #[test]
 fn a_pull_closed_live_is_cut_into_the_replay_tier() {
+    if crate::test_scratch::process::isolate("a_pull_closed_live_is_cut_into_the_replay_tier") {
+        return;
+    }
     let tmp = Temp::new("live-replay");
     let logs = tmp.join("logs");
     std::fs::create_dir_all(&logs).unwrap();
@@ -1947,6 +2074,11 @@ fn a_pull_closed_live_is_cut_into_the_replay_tier() {
 
 #[test]
 fn a_daemon_over_the_fixture_imports_its_history_and_a_restart_adds_nothing() {
+    if crate::test_scratch::process::isolate(
+        "a_daemon_over_the_fixture_imports_its_history_and_a_restart_adds_nothing",
+    ) {
+        return;
+    }
     let tmp = Temp::new("import");
     let hist = tmp.join("history");
     let d = start(options(
@@ -2007,6 +2139,9 @@ fn a_daemon_over_the_fixture_imports_its_history_and_a_restart_adds_nothing() {
 
 #[test]
 fn an_older_log_left_open_at_eof_imports_as_aborted() {
+    if crate::test_scratch::process::isolate("an_older_log_left_open_at_eof_imports_as_aborted") {
+        return;
+    }
     // Two logs in one directory: the newest is the tailed fixture; the
     // older is a different session (its header line differs) cut before its
     // last ENCOUNTER_END, so its final pull never closed.
@@ -2073,6 +2208,11 @@ fn an_older_log_left_open_at_eof_imports_as_aborted() {
 /// the start-up sweep would have written on the next boot.
 #[test]
 fn a_log_left_behind_by_a_switch_imports_its_open_tail_without_a_restart() {
+    if crate::test_scratch::process::isolate(
+        "a_log_left_behind_by_a_switch_imports_its_open_tail_without_a_restart",
+    ) {
+        return;
+    }
     let tmp = Temp::new("retire");
     let logs = tmp.join("logs");
     std::fs::create_dir_all(&logs).unwrap();
@@ -2131,6 +2271,10 @@ fn a_log_left_behind_by_a_switch_imports_its_open_tail_without_a_restart() {
 /// stored exactly once — by import, since its close predates CaughtUp.
 #[test]
 fn a_restart_mid_fight_stores_the_pull_once_via_import() {
+    if crate::test_scratch::process::isolate("a_restart_mid_fight_stores_the_pull_once_via_import")
+    {
+        return;
+    }
     let tmp = Temp::new("midfight");
     let hist = tmp.join("history");
     let text = std::fs::read_to_string(SAMPLE).unwrap();
@@ -2178,6 +2322,9 @@ fn a_restart_mid_fight_stores_the_pull_once_via_import() {
 /// not decode is refused, saying why.
 #[test]
 fn an_import_over_the_socket_lands_in_the_store() {
+    if crate::test_scratch::process::isolate("an_import_over_the_socket_lands_in_the_store") {
+        return;
+    }
     use wowdps_daemon::mock::MockDaemon;
     use wowdps_model::Encounter;
     use wowdps_proto::history::{ImportedCard, ImportedPlayer, imported_id};
@@ -2407,6 +2554,9 @@ fn an_import_over_the_socket_lands_in_the_store() {
 #[test]
 #[ignore = "needs WOWDPS_REAL_LOG pointing at a real combat log"]
 fn real_log_import_reports_fights_wall_time_and_bytes() {
+    if crate::test_scratch::process::isolate("real_log_import_reports_fights_wall_time_and_bytes") {
+        return;
+    }
     let Some(real) = real_log::retail_log() else {
         return;
     };
@@ -2470,6 +2620,11 @@ fn real_log_import_reports_fights_wall_time_and_bytes() {
 
 #[test]
 fn the_mock_answers_history_one_shots_from_its_in_memory_store() {
+    if crate::test_scratch::process::isolate(
+        "the_mock_answers_history_one_shots_from_its_in_memory_store",
+    ) {
+        return;
+    }
     use wowdps_daemon::mock::MockDaemon;
     use wowdps_proto::{ClientMsg, DaemonMsg, FightSort, HistoryAnswer, HistoryQuery};
 
@@ -2786,6 +2941,9 @@ fn the_mock_answers_history_one_shots_from_its_in_memory_store() {
 /// one to the real daemon; then every card they were on is theirs.
 #[test]
 fn the_mock_stamps_the_owner_the_config_would_name() {
+    if crate::test_scratch::process::isolate("the_mock_stamps_the_owner_the_config_would_name") {
+        return;
+    }
     use wowdps_daemon::mock::MockDaemon;
 
     let plain = MockDaemon::fixture().with_history();
@@ -2829,6 +2987,10 @@ fn tree(root: &Path) -> std::collections::BTreeMap<PathBuf, Vec<u8>> {
 /// the disk is byte-for-byte what it was.
 #[test]
 fn a_seeded_mem_backend_reads_through_and_never_writes() {
+    if crate::test_scratch::process::isolate("a_seeded_mem_backend_reads_through_and_never_writes")
+    {
+        return;
+    }
     let tmp = Temp::new("seeded");
     let root = tmp.join("v1");
     let mut disk = Store::open(
@@ -2870,6 +3032,11 @@ fn a_seeded_mem_backend_reads_through_and_never_writes() {
 /// top — and still not one byte written to the directory.
 #[test]
 fn the_mock_answers_from_a_seeded_store_without_writing_it() {
+    if crate::test_scratch::process::isolate(
+        "the_mock_answers_from_a_seeded_store_without_writing_it",
+    ) {
+        return;
+    }
     use wowdps_daemon::mock::MockDaemon;
 
     let tmp = Temp::new("mock-seeded");
@@ -2916,6 +3083,10 @@ fn the_mock_answers_from_a_seeded_store_without_writing_it() {
 /// it — a completed key is a finished run, not an aborted one.
 #[test]
 fn an_older_logs_last_key_left_open_at_eof_is_imported() {
+    if crate::test_scratch::process::isolate("an_older_logs_last_key_left_open_at_eof_is_imported")
+    {
+        return;
+    }
     let tmp = Temp::new("openvisit");
     let logs = tmp.join("logs");
     std::fs::create_dir_all(&logs).unwrap();
@@ -2960,6 +3131,10 @@ fn an_older_logs_last_key_left_open_at_eof_is_imported() {
 /// live — the key must come in, its member boss must not.
 #[test]
 fn importing_an_older_file_by_hand_stores_its_open_key() {
+    if crate::test_scratch::process::isolate("importing_an_older_file_by_hand_stores_its_open_key")
+    {
+        return;
+    }
     let tmp = Temp::new("importfile");
     let text = std::fs::read_to_string(INSTANCE).unwrap();
     let cut = text.find("ZONE_CHANGE,0,\"Silvermoon City\"").unwrap();
@@ -3004,6 +3179,11 @@ fn importing_an_older_file_by_hand_stores_its_open_key() {
 /// promoted to pulls of their own.
 #[test]
 fn an_abandoned_key_is_aborted_and_still_owns_its_bosses() {
+    if crate::test_scratch::process::isolate(
+        "an_abandoned_key_is_aborted_and_still_owns_its_bosses",
+    ) {
+        return;
+    }
     let tmp = Temp::new("abandonedkey");
     let logs = tmp.join("logs");
     std::fs::create_dir_all(&logs).unwrap();
@@ -3046,6 +3226,11 @@ fn an_abandoned_key_is_aborted_and_still_owns_its_bosses() {
 /// plain visit that results does not promote it to a pull of its own.
 #[test]
 fn a_keystone_difficulty_boss_without_its_key_start_is_still_a_member() {
+    if crate::test_scratch::process::isolate(
+        "a_keystone_difficulty_boss_without_its_key_start_is_still_a_member",
+    ) {
+        return;
+    }
     let text = std::fs::read_to_string(INSTANCE).unwrap();
     let headless: String = text
         .lines()
@@ -3077,6 +3262,9 @@ fn a_keystone_difficulty_boss_without_its_key_start_is_still_a_member() {
 /// into the real fight (its END arriving after a restart) keeps it.
 #[test]
 fn a_pin_survives_the_aborted_to_real_rewrite() {
+    if crate::test_scratch::process::isolate("a_pin_survives_the_aborted_to_real_rewrite") {
+        return;
+    }
     let path = Path::new(SAMPLE);
     let text = std::fs::read_to_string(path).unwrap();
     let cut = text.rfind("ENCOUNTER_END").unwrap();
@@ -3106,6 +3294,11 @@ fn a_pin_survives_the_aborted_to_real_rewrite() {
 /// that never finished: aborted, not a run with no verdict.
 #[test]
 fn a_key_left_without_its_end_is_stored_aborted_on_the_live_path() {
+    if crate::test_scratch::process::isolate(
+        "a_key_left_without_its_end_is_stored_aborted_on_the_live_path",
+    ) {
+        return;
+    }
     let text = std::fs::read_to_string(INSTANCE).unwrap();
     let abandoned: String = text
         .lines()
@@ -3130,6 +3323,10 @@ fn a_key_left_without_its_end_is_stored_aborted_on_the_live_path() {
 /// pin kept — and the answer counts what was queued.
 #[test]
 fn a_regrade_rewrites_a_card_in_place_and_keeps_its_pin() {
+    if crate::test_scratch::process::isolate("a_regrade_rewrites_a_card_in_place_and_keeps_its_pin")
+    {
+        return;
+    }
     use wowdps_proto::HistoryAnswer;
     let tmp = Temp::new("regrade");
     let logs = tmp.join("logs");
@@ -3226,6 +3423,9 @@ fn a_regrade_rewrites_a_card_in_place_and_keeps_its_pin() {
 /// them, as a v46 build wrote it) gets them back from its log on a regrade.
 #[test]
 fn a_regrade_brings_a_keys_affixes_back_from_its_log() {
+    if crate::test_scratch::process::isolate("a_regrade_brings_a_keys_affixes_back_from_its_log") {
+        return;
+    }
     use wowdps_proto::HistoryAnswer;
     let tmp = Temp::new("regrade-affixes");
     let logs = tmp.join("logs");
@@ -3301,6 +3501,9 @@ fn a_regrade_brings_a_keys_affixes_back_from_its_log() {
 /// still find their own segment in it.
 #[test]
 fn a_regrade_by_kind_rewrites_every_card_across_logs() {
+    if crate::test_scratch::process::isolate("a_regrade_by_kind_rewrites_every_card_across_logs") {
+        return;
+    }
     use wowdps_proto::HistoryAnswer;
     let tmp = Temp::new("regrade-kind");
     let logs = tmp.join("logs");
@@ -3386,6 +3589,11 @@ fn a_regrade_by_kind_rewrites_every_card_across_logs() {
 /// the Forever card finds its log in Forever's.
 #[test]
 fn a_daemon_following_two_editions_stores_and_regrades_from_both_folders() {
+    if crate::test_scratch::process::isolate(
+        "a_daemon_following_two_editions_stores_and_regrades_from_both_folders",
+    ) {
+        return;
+    }
     use wowdps_model::Edition;
     use wowdps_proto::HistoryAnswer;
     let tmp = Temp::new("two-editions");
@@ -3485,6 +3693,11 @@ fn a_daemon_following_two_editions_stores_and_regrades_from_both_folders() {
 /// they were, byte for byte.
 #[test]
 fn a_regrade_by_edition_gives_a_forever_replay_its_posts() {
+    if crate::test_scratch::process::isolate(
+        "a_regrade_by_edition_gives_a_forever_replay_its_posts",
+    ) {
+        return;
+    }
     use wowdps_model::Edition;
     use wowdps_model::replay::EventKind;
     use wowdps_proto::replay;
@@ -3625,6 +3838,9 @@ fn a_regrade_by_edition_gives_a_forever_replay_its_posts() {
 /// from the log on demand — its own rows and breakdown, nothing stored.
 #[test]
 fn a_keys_member_boss_drills_from_the_log_on_demand() {
+    if crate::test_scratch::process::isolate("a_keys_member_boss_drills_from_the_log_on_demand") {
+        return;
+    }
     use wowdps_model::View;
     use wowdps_proto::{FightSort, HistoryAnswer, HistoryQuery};
     let tmp = Temp::new("bossdrill");
@@ -3752,6 +3968,9 @@ fn a_keys_member_boss_drills_from_the_log_on_demand() {
 /// while the UTC day puts it on 07-28.
 #[test]
 fn a_local_cutover_keeps_an_evening_on_its_own_night() {
+    if crate::test_scratch::process::isolate("a_local_cutover_keeps_an_evening_on_its_own_night") {
+        return;
+    }
     use wowdps_daemon::mock::MockDaemon;
     use wowdps_proto::{ClientMsg, DaemonMsg, HistoryAnswer, HistoryQuery};
     let mut mock = MockDaemon::fixture().with_history();
@@ -3790,6 +4009,9 @@ fn a_local_cutover_keeps_an_evening_on_its_own_night() {
 /// is the only place anybody looks at a raid night after the fact.
 #[test]
 fn every_death_is_stored_as_its_own_window() {
+    if crate::test_scratch::process::isolate("every_death_is_stored_as_its_own_window") {
+        return;
+    }
     let tmp = Temp::new("windows");
     let path = tmp.join("WoWCombatLog-deaths.txt");
     let hit = |sec: u32, spell: &str, amount: u64, hp: u64| {
@@ -3897,6 +4119,9 @@ fn creatures_file(store: &Store<MemBackend>) -> Option<String> {
 /// ascending, and every row the addon pruned in-game kept.
 #[test]
 fn creatures_merge_into_one_file_at_the_store_root() {
+    if crate::test_scratch::process::isolate("creatures_merge_into_one_file_at_the_store_root") {
+        return;
+    }
     let mut store = mem(Retention::default());
     assert!(store.creatures().is_empty());
     assert_eq!(
@@ -3964,6 +4189,9 @@ fn creatures_merge_into_one_file_at_the_store_root() {
 /// this build cannot read whole (a newer format) is never rewritten.
 #[test]
 fn a_creatures_file_is_never_clobbered() {
+    if crate::test_scratch::process::isolate("a_creatures_file_is_never_clobbered") {
+        return;
+    }
     let mut backend = MemBackend::new();
     backend.fail_writes = true;
     let mut store = Store::open(backend, Retention::default());
@@ -4011,6 +4239,11 @@ fn a_creatures_file_is_never_clobbered() {
 /// sibling and a rename (no `.tmp` left behind), read back on open.
 #[test]
 fn the_creatures_file_is_written_atomically_at_the_history_root() {
+    if crate::test_scratch::process::isolate(
+        "the_creatures_file_is_written_atomically_at_the_history_root",
+    ) {
+        return;
+    }
     let tmp = Temp::new("creatures");
     let root = tmp.join("history");
     let mut store = Store::open(DirBackend::new(root.clone()), Retention::default());
@@ -4062,6 +4295,11 @@ fn the_creatures_file_is_written_atomically_at_the_history_root() {
 /// of unrelated addon rows.
 #[test]
 fn a_row_written_to_the_file_after_open_survives_a_merge() {
+    if crate::test_scratch::process::isolate(
+        "a_row_written_to_the_file_after_open_survives_a_merge",
+    ) {
+        return;
+    }
     let tmp = Temp::new("creatures-outside");
     let root = tmp.join("history");
     let mut store = Store::open(DirBackend::new(root.clone()), Retention::default());
@@ -4109,6 +4347,11 @@ fn a_row_written_to_the_file_after_open_survives_a_merge() {
 /// replaces the store's own older one.
 #[test]
 fn an_outside_row_yields_only_to_a_strictly_newer_sighting() {
+    if crate::test_scratch::process::isolate(
+        "an_outside_row_yields_only_to_a_strictly_newer_sighting",
+    ) {
+        return;
+    }
     let tmp = Temp::new("creatures-newer");
     let root = tmp.join("history");
     let mut store = Store::open(DirBackend::new(root.clone()), Retention::default());
@@ -4173,6 +4416,9 @@ fn an_outside_row_yields_only_to_a_strictly_newer_sighting() {
 /// sighting alone.
 #[test]
 fn a_seed_row_at_seen_zero_survives_the_merge() {
+    if crate::test_scratch::process::isolate("a_seed_row_at_seen_zero_survives_the_merge") {
+        return;
+    }
     let tmp = Temp::new("creatures-seed");
     let root = tmp.join("history");
     let mut store = Store::open(DirBackend::new(root.clone()), Retention::default());
@@ -4224,6 +4470,10 @@ fn a_seed_row_at_seen_zero_survives_the_merge() {
 /// reads again is merged into once more.
 #[test]
 fn a_creatures_file_refused_mid_run_is_never_clobbered() {
+    if crate::test_scratch::process::isolate("a_creatures_file_refused_mid_run_is_never_clobbered")
+    {
+        return;
+    }
     let tmp = Temp::new("creatures-refused");
     let root = tmp.join("history");
     let mut store = Store::open(DirBackend::new(root.clone()), Retention::default());
@@ -4268,6 +4518,11 @@ fn a_creatures_file_refused_mid_run_is_never_clobbered() {
 #[cfg(unix)]
 #[test]
 fn an_unreadable_creatures_file_is_refused_not_rewritten() {
+    if crate::test_scratch::process::isolate(
+        "an_unreadable_creatures_file_is_refused_not_rewritten",
+    ) {
+        return;
+    }
     use std::os::unix::fs::PermissionsExt;
     let tmp = Temp::new("creatures-unreadable");
     let root = tmp.join("history");
@@ -4338,6 +4593,11 @@ fn affiliation(guid: &str, guild: &str, mine: bool, seen_utc_ms: i64) -> Affilia
 /// one.
 #[test]
 fn affiliations_are_merged_newest_first_and_joined_when_a_card_is_answered() {
+    if crate::test_scratch::process::isolate(
+        "affiliations_are_merged_newest_first_and_joined_when_a_card_is_answered",
+    ) {
+        return;
+    }
     let mut store = store_of(
         &[card(
             7,
@@ -4442,6 +4702,11 @@ fn clone_backend(b: &MemBackend) -> MemBackend {
 /// and two logs sharing a guildmate cannot mistake them for the logger.
 #[test]
 fn the_addons_own_characters_name_the_owner_before_the_intersection() {
+    if crate::test_scratch::process::isolate(
+        "the_addons_own_characters_name_the_owner_before_the_intersection",
+    ) {
+        return;
+    }
     // One log: the intersection cannot tell A from B.
     let mut store = store_of(
         &[card(
@@ -4505,6 +4770,11 @@ fn the_addons_own_characters_name_the_owner_before_the_intersection() {
 /// a night on an alt still marks the alt "you".
 #[test]
 fn mine_is_every_character_of_the_account_the_store_knows() {
+    if crate::test_scratch::process::isolate(
+        "mine_is_every_character_of_the_account_the_store_knows",
+    ) {
+        return;
+    }
     let mut store = store_of(
         &[card(
             7,
@@ -4648,6 +4918,11 @@ fn saved_variables_error(tag: &str, data: &[u8]) -> (String, PathBuf) {
 
 #[test]
 fn saved_variables_parse_errors_publish_account_number_and_file_context() {
+    if crate::test_scratch::process::isolate(
+        "saved_variables_parse_errors_publish_account_number_and_file_context",
+    ) {
+        return;
+    }
     let (error, path) = saved_variables_error("sv-parse-label", b"WOWDPS_DATA = {");
     let display = path
         .parent()
@@ -4663,6 +4938,11 @@ fn saved_variables_parse_errors_publish_account_number_and_file_context() {
 
 #[test]
 fn saved_variables_read_errors_publish_account_number_and_os_error() {
+    if crate::test_scratch::process::isolate(
+        "saved_variables_read_errors_publish_account_number_and_os_error",
+    ) {
+        return;
+    }
     // Invalid UTF-8 reliably fails read_to_string even when tests run as root.
     let (error, path) = saved_variables_error("sv-read-label", &[0xff]);
     let display = path
@@ -4688,6 +4968,11 @@ fn saved_variables_read_errors_publish_account_number_and_os_error() {
 /// answers cards with their guilds joined.
 #[test]
 fn a_daemon_updates_a_stale_addon_and_files_the_saved_variables_it_finds() {
+    if crate::test_scratch::process::isolate(
+        "a_daemon_updates_a_stale_addon_and_files_the_saved_variables_it_finds",
+    ) {
+        return;
+    }
     let tmp = Temp::new("addon");
     let product = fake_install(&tmp, SAMPLE_SAVED_VARIABLES);
     let logs = product.join("Logs");
@@ -4799,6 +5084,9 @@ fn a_daemon_updates_a_stale_addon_and_files_the_saved_variables_it_finds() {
 /// Never installed stays never installed: the daemon only ever updates.
 #[test]
 fn a_daemon_leaves_a_missing_addon_missing() {
+    if crate::test_scratch::process::isolate("a_daemon_leaves_a_missing_addon_missing") {
+        return;
+    }
     let tmp = Temp::new("no-addon");
     let product = fake_install(&tmp, "WOWDPS_DATA = {}\n");
     std::fs::remove_dir_all(product.join("Interface")).unwrap();
@@ -4818,6 +5106,9 @@ fn a_daemon_leaves_a_missing_addon_missing() {
 /// never the store-wide owner stamped onto a night they were not in.
 #[test]
 fn a_card_is_owned_by_the_account_character_on_it() {
+    if crate::test_scratch::process::isolate("a_card_is_owned_by_the_account_character_on_it") {
+        return;
+    }
     let main = card(
         7,
         1_000,
@@ -4873,6 +5164,9 @@ fn a_card_is_owned_by_the_account_character_on_it() {
 /// written before ownership was per card) is re-stamped on open.
 #[test]
 fn opening_the_store_repairs_owners_not_on_the_roster() {
+    if crate::test_scratch::process::isolate("opening_the_store_repairs_owners_not_on_the_roster") {
+        return;
+    }
     let mut wrong = card(
         7,
         1_000,
@@ -4932,6 +5226,9 @@ fn opening_the_store_repairs_owners_not_on_the_roster() {
 /// has none.
 #[test]
 fn a_stored_fight_carries_the_live_raid_timeline() {
+    if crate::test_scratch::process::isolate("a_stored_fight_carries_the_live_raid_timeline") {
+        return;
+    }
     use wowdps_model::View;
     let spans = concat!(env!("CARGO_MANIFEST_DIR"), "/../core/fixtures/spans.txt");
     let mut checked = 0;
@@ -5091,6 +5388,10 @@ fn rez_pull() -> String {
 /// every view the store answers.
 #[test]
 fn a_stored_fight_rebuilds_its_rezzes_as_live_has_them() {
+    if crate::test_scratch::process::isolate("a_stored_fight_rebuilds_its_rezzes_as_live_has_them")
+    {
+        return;
+    }
     use wowdps_model::View;
     let tmp = Temp::new("rez");
     let path = tmp.join("WoWCombatLog-rez.txt");
@@ -5145,6 +5446,9 @@ fn a_stored_fight_rebuilds_its_rezzes_as_live_has_them() {
 /// window from the series tier.
 #[test]
 fn pinning_a_wipe_backfills_its_series_from_the_log() {
+    if crate::test_scratch::process::isolate("pinning_a_wipe_backfills_its_series_from_the_log") {
+        return;
+    }
     use wowdps_model::View;
     use wowdps_proto::{FightSort, HistoryAnswer, HistoryQuery};
     let tmp = Temp::new("seriespin");
@@ -5275,6 +5579,9 @@ fn pinning_a_wipe_backfills_its_series_from_the_log() {
 /// is demoted.
 #[test]
 fn a_kill_is_kept_whole_unless_the_config_says_not() {
+    if crate::test_scratch::process::isolate("a_kill_is_kept_whole_unless_the_config_says_not") {
+        return;
+    }
     let pulls = [(100, true), (50, true)];
     let cfg = Retention {
         keep_details_per_encounter: 0,
@@ -5292,3 +5599,6 @@ fn a_kill_is_kept_whole_unless_the_config_says_not() {
     assert!(!store.has_details(&ids[0]), "the slower kill is demoted");
     assert!(store.has_details(&ids[1]), "the fastest stays protected");
 }
+
+#[path = "../../test-support/scratch.rs"]
+mod test_scratch;

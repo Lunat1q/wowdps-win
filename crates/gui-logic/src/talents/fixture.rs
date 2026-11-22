@@ -120,7 +120,7 @@ pub struct Sandbox {
 impl Sandbox {
     /// `tag` names the scratch directory; make it unique per test.
     pub fn new(tag: &str) -> Self {
-        let dir = std::env::temp_dir().join(format!(
+        let dir = crate::test_scratch::root().join(format!(
             "wowdps-talents-sandbox-{}-{tag}",
             std::process::id()
         ));

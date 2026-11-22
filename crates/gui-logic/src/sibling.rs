@@ -21,7 +21,8 @@ mod tests {
 
     #[test]
     fn the_daemon_is_the_sibling_else_the_name_on_path() {
-        let dir = std::env::temp_dir().join(format!("wowdps-sibling-{}", std::process::id()));
+        let dir =
+            crate::test_scratch::root().join(format!("wowdps-sibling-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         let gui = dir.join("wowdps-gui");

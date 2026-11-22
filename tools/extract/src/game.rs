@@ -339,7 +339,8 @@ mod tests {
 
     #[test]
     fn ancestor_walk_finds_the_install_root_from_a_logs_dir() {
-        let dir = std::env::temp_dir().join(format!("wowdps-game-test-{}", std::process::id()));
+        let dir =
+            crate::test_scratch::root().join(format!("wowdps-game-test-{}", std::process::id()));
         let wow = dir.join("World of Warcraft");
         std::fs::create_dir_all(wow.join("Data").join("data")).unwrap();
         std::fs::write(wow.join(".build.info"), "x").unwrap();
@@ -356,7 +357,8 @@ mod tests {
     }
 
     fn scratch(name: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("wowdps-game-{name}-{}", std::process::id()));
+        let dir =
+            crate::test_scratch::root().join(format!("wowdps-game-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         dir

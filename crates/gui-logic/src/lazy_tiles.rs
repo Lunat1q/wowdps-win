@@ -84,8 +84,8 @@ mod tests {
     /// the same pixels and no picture can catch it.
     #[test]
     fn a_tile_is_made_once_and_every_lookup_clones_it() {
-        let path =
-            std::env::temp_dir().join(format!("wowdps-lazy-tiles-test-{}.bin", std::process::id()));
+        let path = crate::test_scratch::root()
+            .join(format!("wowdps-lazy-tiles-test-{}.bin", std::process::id()));
         std::fs::write(&path, [1u8, 2, 3, 4, 5, 6, 7, 8]).unwrap();
         let tiles: Tiles<u32, (usize, Vec<u8>)> = Tiles::new(File::open(&path).unwrap());
         let made = Cell::new(0);

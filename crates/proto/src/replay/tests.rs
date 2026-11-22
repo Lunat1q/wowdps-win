@@ -574,7 +574,7 @@ fn a_name_is_quoted_only_when_it_holds_a_comma() {
 
 #[test]
 fn the_seven_files_are_written() {
-    let dir = std::env::temp_dir().join(format!("wowdps-replay-csv-{}", std::process::id()));
+    let dir = crate::test_scratch::root().join(format!("wowdps-replay-csv-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     csv::write_dir(
         &dir,

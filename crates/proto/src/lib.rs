@@ -48,3 +48,7 @@ pub use msg::{
     loading_status,
 };
 pub use wire::{DecodeError, MAX_FRAME};
+
+#[cfg(test)]
+#[path = "../../test-support/scratch.rs"]
+mod test_scratch;

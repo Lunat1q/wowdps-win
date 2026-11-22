@@ -50,7 +50,8 @@ struct Temp(PathBuf);
 
 impl Temp {
     fn new(tag: &str) -> Self {
-        let p = std::env::temp_dir().join(format!("wowdps-lake-{tag}-{}", std::process::id()));
+        let p = crate::test_scratch::short_root()
+            .join(format!("wowdps-lake-{tag}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&p);
         std::fs::create_dir_all(&p).unwrap();
         Temp(p)
@@ -59,7 +60,7 @@ impl Temp {
 
 impl Drop for Temp {
     fn drop(&mut self) {
-        let _ = std::fs::remove_dir_all(&self.0);
+        crate::test_scratch::remove_when_quiet(&self.0);
     }
 }
 
@@ -440,6 +441,9 @@ fn sorted(mut t: wowdps_history::Table) -> wowdps_history::Table {
 
 #[test]
 fn the_daemon_and_sql_agree_over_the_same_lake() {
+    if crate::test_scratch::process::isolate("the_daemon_and_sql_agree_over_the_same_lake") {
+        return;
+    }
     let tmp = Temp::new("parity");
     let (socket, hist, _done) = start(&tmp);
     let mut client =
@@ -695,6 +699,9 @@ fn the_daemon_and_sql_agree_over_the_same_lake() {
 
 #[test]
 fn an_empty_lake_opens_with_no_views_and_says_so() {
+    if crate::test_scratch::process::isolate("an_empty_lake_opens_with_no_views_and_says_so") {
+        return;
+    }
     let tmp = Temp::new("empty");
     let lake = Lake::open(&tmp.0).unwrap();
     assert!(lake.views().is_empty());
@@ -713,6 +720,9 @@ fn an_empty_lake_opens_with_no_views_and_says_so() {
 
 #[test]
 fn network_access_is_off() {
+    if crate::test_scratch::process::isolate("network_access_is_off") {
+        return;
+    }
     let tmp = Temp::new("offline");
     let lake = Lake::open(&tmp.0).unwrap();
     // Extensions can neither be installed (the repository is a path that
@@ -769,6 +779,9 @@ fn network_access_is_off() {
 
 #[test]
 fn the_floors_are_the_graders_floors() {
+    if crate::test_scratch::process::isolate("the_floors_are_the_graders_floors") {
+        return;
+    }
     // The binary cannot link the mcp crate, so the constants are copied;
     // this is what keeps the copies honest.
     assert_eq!(wowdps_history::DPS_FLOOR, wowdps_mcp::DPS_FLOOR);
@@ -827,6 +840,10 @@ fn card(id: &str, players: Vec<CardPlayer>) -> FightCard {
 
 #[test]
 fn the_floors_exclude_in_sql_exactly_as_the_daemon_does() {
+    if crate::test_scratch::process::isolate("the_floors_exclude_in_sql_exactly_as_the_daemon_does")
+    {
+        return;
+    }
     // The fixture has nobody the floors drop, so a hand-built lake: three
     // healers with one at zero hps (under both floors, but still in the
     // median-of-others pool), four DPS with one at 1% of the top (under
@@ -958,6 +975,11 @@ fn the_floors_exclude_in_sql_exactly_as_the_daemon_does() {
 /// unlisted nonzero id as itself.
 #[test]
 fn sql_names_editions_and_keeps_progression_apart_as_the_daemon_does() {
+    if crate::test_scratch::process::isolate(
+        "sql_names_editions_and_keeps_progression_apart_as_the_daemon_does",
+    ) {
+        return;
+    }
     let tmp = Temp::new("editions");
     std::fs::create_dir_all(tmp.0.join("fights")).unwrap();
     let pull = |id: &str, project_id: u8, start: i64, kill: bool| FightCard {
@@ -1068,6 +1090,11 @@ fn sql_names_editions_and_keeps_progression_apart_as_the_daemon_does() {
 
 #[test]
 fn a_card_with_no_specs_at_all_still_answers_role_queries() {
+    if crate::test_scratch::process::isolate(
+        "a_card_with_no_specs_at_all_still_answers_role_queries",
+    ) {
+        return;
+    }
     // An arena card (arena.txt carries no COMBATANT_INFO) or an R8-failed
     // roster stores `"role": null` on every player. With nothing but such
     // cards DuckDB sniffs the field as JSON, not VARCHAR — which is why the
@@ -1154,6 +1181,11 @@ fn a_card_with_no_specs_at_all_still_answers_role_queries() {
 /// still has the column, NULL throughout, and its `role` is the spec's.
 #[test]
 fn a_stored_role_rides_the_players_view_and_ranks_as_the_grader_does() {
+    if crate::test_scratch::process::isolate(
+        "a_stored_role_rides_the_players_view_and_ranks_as_the_grader_does",
+    ) {
+        return;
+    }
     let mut specless = card(
         "s",
         vec![
@@ -1242,6 +1274,11 @@ fn a_stored_role_rides_the_players_view_and_ranks_as_the_grader_does() {
 /// player exactly as the grader does over the parsed card.
 #[test]
 fn a_stored_role_that_names_no_role_reads_null_as_the_codec_reads_none() {
+    if crate::test_scratch::process::isolate(
+        "a_stored_role_that_names_no_role_reads_null_as_the_codec_reads_none",
+    ) {
+        return;
+    }
     let mut odd = card(
         "o",
         vec![
@@ -1429,6 +1466,9 @@ fn assert_pcts_agree(lake: &Lake, tag: &str) {
 
 #[test]
 fn the_taken_views_answer_the_r17_fixture() {
+    if crate::test_scratch::process::isolate("the_taken_views_answer_the_r17_fixture") {
+        return;
+    }
     let tmp = Temp::new("taken");
     let (socket, hist, _done) = start_over(&tmp, TAKEN_FIXTURE);
     let mut client =
@@ -1848,6 +1888,9 @@ fn pre_2b_rows(rows: &Json, id: &str, empty: bool) -> Json {
 
 #[test]
 fn the_taken_identities_hold_in_sql() {
+    if crate::test_scratch::process::isolate("the_taken_identities_hold_in_sql") {
+        return;
+    }
     let tmp = Temp::new("taken-sql");
     let tanks = tanks();
     let (card, rows) = hand_built("hand", &tanks);
@@ -1906,6 +1949,10 @@ fn the_taken_identities_hold_in_sql() {
 
 #[test]
 fn a_mixed_lake_opens_and_says_which_taken_views_exist() {
+    if crate::test_scratch::process::isolate("a_mixed_lake_opens_and_says_which_taken_views_exist")
+    {
+        return;
+    }
     let tanks = tanks();
     let (card, rows) = hand_built("new", &tanks);
     // A pre-2b lake alone: the four views cannot be defined at all, and
@@ -2242,6 +2289,9 @@ fn assert_effective_agrees(
 
 #[test]
 fn the_support_views_answer_the_r19_fixture() {
+    if crate::test_scratch::process::isolate("the_support_views_answer_the_r19_fixture") {
+        return;
+    }
     let tmp = Temp::new("support");
     let (socket, hist, _done) = start_over(&tmp, SUPPORT_FIXTURE);
     let mut client =
@@ -2749,6 +2799,9 @@ fn dps_order(lake: &Lake, fight: &str) -> Vec<(String, u64, f64)> {
 
 #[test]
 fn a_pre_3b_card_ranks_exactly_as_v22_did() {
+    if crate::test_scratch::process::isolate("a_pre_3b_card_ranks_exactly_as_v22_did") {
+        return;
+    }
     let new = support_card("new");
     let new_text = new.to_json().to_line();
     assert!(new_text.contains("\"effective_dps\":"), "{new_text}");
@@ -2903,6 +2956,11 @@ fn a_pre_3b_card_ranks_exactly_as_v22_did() {
 
 #[test]
 fn a_mixed_lake_opens_and_says_which_support_views_exist() {
+    if crate::test_scratch::process::isolate(
+        "a_mixed_lake_opens_and_says_which_support_views_exist",
+    ) {
+        return;
+    }
     let card = support_card("new").to_json();
     let rows = support_rows("new").to_json();
     assert!(
@@ -3255,6 +3313,9 @@ fn assert_coarse_identities(lake: &Lake, tag: &str) {
 
 #[test]
 fn the_span_views_answer_the_r18_fixture() {
+    if crate::test_scratch::process::isolate("the_span_views_answer_the_r18_fixture") {
+        return;
+    }
     let tmp = Temp::new("spans");
     let (socket, hist, _done) = start_over(&tmp, SPANS_FIXTURE);
     let mut client =
@@ -3715,6 +3776,9 @@ fn pre_4b_rows(rows: &Json, id: &str, empty: bool) -> Json {
 
 #[test]
 fn the_span_identities_hold_in_sql() {
+    if crate::test_scratch::process::isolate("the_span_identities_hold_in_sql") {
+        return;
+    }
     let card = spans_card("new");
     let rows = spans_rows("new");
     let (card_json, rows_json) = (card.to_json(), rows.to_json());
@@ -3826,6 +3890,9 @@ fn the_span_identities_hold_in_sql() {
 
 #[test]
 fn a_mixed_lake_opens_and_says_which_span_views_exist() {
+    if crate::test_scratch::process::isolate("a_mixed_lake_opens_and_says_which_span_views_exist") {
+        return;
+    }
     let card = spans_card("new").to_json();
     let rows = spans_rows("new").to_json();
     let ranks_alone = {
@@ -4068,6 +4135,9 @@ fn daemon_lake_with(tmp: &Temp, fixture: &str, fights: u32, addon_dir: Option<Pa
 /// row for a parameter that fits its question.
 #[test]
 fn every_documented_query_runs_over_the_fixture_lake() {
+    if crate::test_scratch::process::isolate("every_documented_query_runs_over_the_fixture_lake") {
+        return;
+    }
     let spans = Temp::new("doc-spans");
     // v31: the spans daemon runs inside a fake install whose account has
     // the addon's SavedVariables, so the lake carries `affiliations/`.
@@ -4220,6 +4290,9 @@ fn stored_rows(dir: &Path) -> Vec<FightRows> {
 
 #[test]
 fn the_stack_views_answer_the_r21_fixture() {
+    if crate::test_scratch::process::isolate("the_stack_views_answer_the_r21_fixture") {
+        return;
+    }
     let tmp = Temp::new("stacks");
     let (socket, hist, _done) = start_over(&tmp, STACKS_FIXTURE);
     let mut client =
@@ -4642,6 +4715,9 @@ fn assert_role_night_matches(
 
 #[test]
 fn the_shield_views_answer_the_r20_fixture() {
+    if crate::test_scratch::process::isolate("the_shield_views_answer_the_r20_fixture") {
+        return;
+    }
     let tmp = Temp::new("shields");
     let (socket, hist, _done) = start_over(&tmp, SHIELDS_FIXTURE);
     let mut client =
@@ -5057,6 +5133,9 @@ fn pre_5_rows(rows: &Json, id: &str, empty: bool) -> Json {
 
 #[test]
 fn the_shield_identities_hold_in_sql() {
+    if crate::test_scratch::process::isolate("the_shield_identities_hold_in_sql") {
+        return;
+    }
     let card = shields_card("new");
     let rows = shields_rows("new");
     let (card_json, rows_json) = (card.to_json(), rows.to_json());
@@ -5197,6 +5276,9 @@ fn the_shield_identities_hold_in_sql() {
 /// aborted pull that never counts, and an enemy that is never rostered.
 #[test]
 fn role_night_folds_the_nights_pulls_in_sql() {
+    if crate::test_scratch::process::isolate("role_night_folds_the_nights_pulls_in_sql") {
+        return;
+    }
     const DAY: i64 = 86_400_000;
     let secs = DURATION_4B as f64 / 1000.0;
     let mut pulls: Vec<FightCard> = Vec::new();
@@ -5384,6 +5466,9 @@ fn role_night_folds_the_nights_pulls_in_sql() {
 /// an enemy (never rostered) and an aborted pull (never counted).
 #[test]
 fn role_night_folds_by_the_mode_role_in_both_readers() {
+    if crate::test_scratch::process::isolate("role_night_folds_by_the_mode_role_in_both_readers") {
+        return;
+    }
     const DAY: i64 = 86_400_000;
     const SWAP: &str = "swap";
     const NOSPEC: &str = "nospec";
@@ -5634,6 +5719,9 @@ fn role_night_folds_by_the_mode_role_in_both_readers() {
 /// `Lake::role_night`, every field equal, f64 by bits.
 #[test]
 fn role_night_rosters_stored_roles_in_both_readers() {
+    if crate::test_scratch::process::isolate("role_night_rosters_stored_roles_in_both_readers") {
+        return;
+    }
     const DAY: i64 = 86_400_000;
     const TANKED: &str = "tanked";
     const TIED: &str = "tied";
@@ -5764,6 +5852,10 @@ fn role_night_rosters_stored_roles_in_both_readers() {
 
 #[test]
 fn a_mixed_lake_opens_and_says_which_shield_views_exist() {
+    if crate::test_scratch::process::isolate("a_mixed_lake_opens_and_says_which_shield_views_exist")
+    {
+        return;
+    }
     let card = shields_card("new").to_json();
     let rows = shields_rows("new").to_json();
     let ranks_alone = {
@@ -5918,6 +6010,9 @@ fn a_mixed_lake_opens_and_says_which_shield_views_exist() {
 /// seconds summing to the friendly Damage rows' total, R25's identity.
 #[test]
 fn the_replay_tier_exports_offline_and_stats_count_it() {
+    if crate::test_scratch::process::isolate("the_replay_tier_exports_offline_and_stats_count_it") {
+        return;
+    }
     let tmp = Temp::new("replay");
     let (socket, hist, _done) = start(&tmp);
     let mut client =
@@ -6011,6 +6106,11 @@ fn the_replay_tier_exports_offline_and_stats_count_it() {
 /// tier it never had aside.
 #[test]
 fn an_imported_fight_is_a_column_and_out_of_the_fixed_questions() {
+    if crate::test_scratch::process::isolate(
+        "an_imported_fight_is_a_column_and_out_of_the_fixed_questions",
+    ) {
+        return;
+    }
     use wowdps_proto::OriginFilter;
     use wowdps_proto::history::{ImportedCard, ImportedPlayer, imported_id};
 
@@ -6209,6 +6309,11 @@ fn an_imported_fight_is_a_column_and_out_of_the_fixed_questions() {
 /// nothing, and one this build cannot read says why.
 #[test]
 fn the_addons_creatures_land_beside_the_lake_and_stats_counts_them() {
+    if crate::test_scratch::process::isolate(
+        "the_addons_creatures_land_beside_the_lake_and_stats_counts_them",
+    ) {
+        return;
+    }
     let tmp = Temp::new("creatures");
     let product = fake_product(&tmp);
     let hist = daemon_lake_with(&tmp, SPANS_FIXTURE, 1, Some(product));
@@ -6258,6 +6363,9 @@ fn the_addons_creatures_land_beside_the_lake_and_stats_counts_them() {
 /// reference would answer with more JSON).
 #[test]
 fn a_keys_affixes_are_a_column_on_every_lake() {
+    if crate::test_scratch::process::isolate("a_keys_affixes_are_a_column_on_every_lake") {
+        return;
+    }
     use wowdps_proto::history::KeyInfo;
     // A player each: a lake needs one to type its `players` view.
     let one = || vec![player("Player-1-A", Spec::FrostMage, 1000.0, 0.0)];
@@ -6314,4 +6422,36 @@ fn a_keys_affixes_are_a_column_on_every_lake() {
             ("d".to_string(), "null".to_string()),
         ]
     );
+}
+
+#[path = "../../test-support/scratch.rs"]
+mod test_scratch;
+
+#[test]
+fn parity_socket_fits_when_the_system_temp_path_is_long() {
+    const CASE: &str = "parity_socket_fits_when_the_system_temp_path_is_long";
+    if std::env::var_os("WOWDPS_PARITY_LONG_TMP").is_some() {
+        let tmp = Temp::new("parity");
+        let socket = tmp.0.join("test.sock");
+        let capacity = if cfg!(target_os = "linux") { 108 } else { 104 };
+        assert!(
+            socket.as_os_str().len() < capacity,
+            "socket path: {socket:?}"
+        );
+        let bound = std::os::unix::net::UnixListener::bind(&socket);
+        assert!(bound.is_ok(), "bind {socket:?}: {bound:?}");
+        return;
+    }
+    let parent = test_scratch::Dir::new_in(&test_scratch::short_root());
+    let long = parent
+        .path()
+        .join("x".repeat(76 - parent.path().as_os_str().len() - 1));
+    std::fs::create_dir(&long).unwrap();
+    let output = std::process::Command::new(std::env::current_exe().unwrap())
+        .args(["--exact", CASE, "--nocapture"])
+        .env("WOWDPS_PARITY_LONG_TMP", "1")
+        .env("TMPDIR", &long)
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "{output:?}");
 }

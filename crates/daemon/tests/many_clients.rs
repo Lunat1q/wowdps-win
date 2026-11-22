@@ -23,7 +23,8 @@ struct Temp(PathBuf);
 
 impl Temp {
     fn new(tag: &str) -> Self {
-        let p = std::env::temp_dir().join(format!("wowdps-many-{tag}-{}", std::process::id()));
+        let p = crate::test_scratch::short_root()
+            .join(format!("wowdps-many-{tag}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&p);
         // The panic bans reach helpers outside `#[test]` fns, so scaffolding
         // failures assert rather than unwrap.
@@ -37,7 +38,7 @@ impl Temp {
 
 impl Drop for Temp {
     fn drop(&mut self) {
-        let _ = std::fs::remove_dir_all(&self.0);
+        crate::test_scratch::remove_when_quiet(&self.0);
     }
 }
 
@@ -197,6 +198,9 @@ fn seq_of(msg: &DaemonMsg) -> Option<u64> {
 /// per-session strictly monotonic seq.
 #[test]
 fn a_dozen_mixed_cursors_each_get_only_their_own_feed() {
+    if crate::test_scratch::process::isolate("a_dozen_mixed_cursors_each_get_only_their_own_feed") {
+        return;
+    }
     let tmp = Temp::new("mixed");
     let d = start(options(&tmp, SourceSpec::File(PathBuf::from(FIXTURE))));
 
@@ -312,6 +316,9 @@ fn a_dozen_mixed_cursors_each_get_only_their_own_feed() {
 /// count settles back down to exactly the survivors.
 #[test]
 fn churn_does_not_wedge_the_daemon_or_leak_sessions() {
+    if crate::test_scratch::process::isolate("churn_does_not_wedge_the_daemon_or_leak_sessions") {
+        return;
+    }
     let tmp = Temp::new("churn");
     let log = tmp.join("WoWCombatLog.txt");
     append(&log, &hit(0, 0));
@@ -397,3 +404,6 @@ fn churn_does_not_wedge_the_daemon_or_leak_sessions() {
     let result = d.done.recv_timeout(DEADLINE).expect("daemon exited");
     assert!(result.is_ok(), "{result:?}");
 }
+
+#[path = "../../test-support/scratch.rs"]
+mod test_scratch;

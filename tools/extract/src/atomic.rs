@@ -56,7 +56,8 @@ mod tests {
     use super::*;
 
     fn scratch(name: &str) -> PathBuf {
-        let d = std::env::temp_dir().join(format!("atomic-test-{}-{name}", std::process::id()));
+        let d =
+            crate::test_scratch::root().join(format!("atomic-test-{}-{name}", std::process::id()));
         let _ = std::fs::remove_dir_all(&d);
         std::fs::create_dir_all(&d).unwrap();
         d

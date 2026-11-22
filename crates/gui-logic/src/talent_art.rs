@@ -186,7 +186,7 @@ mod tests {
 
     impl TempFile {
         fn new(name: &str, bytes: &[u8]) -> Self {
-            let path = std::env::temp_dir().join(format!(
+            let path = crate::test_scratch::root().join(format!(
                 "wowdps-talent-art-test-{}-{name}.bin",
                 std::process::id()
             ));
@@ -225,7 +225,7 @@ mod tests {
 
     #[test]
     fn absent_and_garbage_open_as_none() {
-        let path = std::env::temp_dir().join(format!(
+        let path = crate::test_scratch::root().join(format!(
             "wowdps-talent-art-test-{}-absent.bin",
             std::process::id()
         ));

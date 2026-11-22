@@ -904,7 +904,7 @@ struct TempDir(std::path::PathBuf);
 
 impl TempDir {
     fn new(tag: &str) -> Self {
-        let dir = std::env::temp_dir().join(format!("{tag}-{}", std::process::id()));
+        let dir = crate::test_scratch::root().join(format!("{tag}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         TempDir(dir)
     }
@@ -1129,3 +1129,6 @@ fn a_stored_kill_answers_the_drilled_players_resources() {
         "no details, none"
     );
 }
+
+#[path = "../../test-support/scratch.rs"]
+mod test_scratch;

@@ -376,8 +376,10 @@ impl Drop for Scratch {
 fn older_night(cx: &mut TestAppContext, tag: &str, subdirs: &[&str]) -> (Rig, Scratch) {
     use wowdps_daemon::history::Backend as _;
     use wowdps_daemon::mock::MockDaemon;
-    let scratch =
-        Scratch(std::env::temp_dir().join(format!("wowdps-gui-{tag}-{}", std::process::id())));
+    let scratch = Scratch(
+        wowdps_gui_logic::test_scratch::root()
+            .join(format!("wowdps-gui-{tag}-{}", std::process::id())),
+    );
     let dir = scratch.0.clone();
     let _ = std::fs::remove_dir_all(&dir);
     let older = MockDaemon::fixture().with_history();

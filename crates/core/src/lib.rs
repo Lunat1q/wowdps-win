@@ -24,3 +24,10 @@ pub mod roles;
 pub mod tail;
 #[cfg(any(test, feature = "testkit"))]
 pub mod testkit;
+
+#[cfg(test)]
+#[path = "../../test-support/scratch_tests.rs"]
+mod scratch_tests;
+#[cfg(test)]
+#[path = "../../test-support/scratch.rs"]
+mod test_scratch;

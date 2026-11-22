@@ -40,7 +40,8 @@ impl Temp {
     fn new(tag: &str) -> Self {
         static N: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
         let n = N.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        let p = std::env::temp_dir().join(format!("wowdps-sweep-{tag}-{}-{n}", std::process::id()));
+        let p = crate::test_scratch::short_root()
+            .join(format!("wowdps-sweep-{tag}-{}-{n}", std::process::id()));
         let _ = std::fs::remove_dir_all(&p);
         std::fs::create_dir_all(&p).unwrap();
         Temp(p)
@@ -52,7 +53,7 @@ impl Temp {
 
 impl Drop for Temp {
     fn drop(&mut self) {
-        let _ = std::fs::remove_dir_all(&self.0);
+        crate::test_scratch::remove_when_quiet(&self.0);
     }
 }
 
@@ -422,6 +423,11 @@ const FOLDER_FIGHTS: u32 = 4 + 4 + 3;
 /// alone, the rest kept — it is read again, and the moved pull is stored.
 #[test]
 fn an_older_log_is_read_again_only_when_its_file_changed() {
+    if crate::test_scratch::process::isolate(
+        "an_older_log_is_read_again_only_when_its_file_changed",
+    ) {
+        return;
+    }
     let f = Folder::new("rule");
     run_until(f.options(), FOLDER_FIGHTS);
     let [a, b] = f.older.clone();
@@ -490,6 +496,9 @@ fn an_older_log_is_read_again_only_when_its_file_changed() {
 /// card deleted by hand reads its log again and is stored back.
 #[test]
 fn a_fight_missing_from_the_store_reads_its_log_again() {
+    if crate::test_scratch::process::isolate("a_fight_missing_from_the_store_reads_its_log_again") {
+        return;
+    }
     let f = Folder::new("wiped");
     run_until(f.options(), FOLDER_FIGHTS);
     let [a, b] = f.older.clone();
@@ -521,6 +530,9 @@ fn a_fight_missing_from_the_store_reads_its_log_again() {
 /// bringing back what now fits.
 #[test]
 fn an_evicted_fight_reads_no_log_until_the_rules_move() {
+    if crate::test_scratch::process::isolate("an_evicted_fight_reads_no_log_until_the_rules_move") {
+        return;
+    }
     let tmp = Temp::new("evicted");
     let logs = tmp.join("logs");
     std::fs::create_dir_all(&logs).unwrap();
@@ -580,6 +592,11 @@ fn an_evicted_fight_reads_no_log_until_the_rules_move() {
 /// passed over on the start after.
 #[test]
 fn the_log_tailed_last_run_is_read_whole_once_it_is_older() {
+    if crate::test_scratch::process::isolate(
+        "the_log_tailed_last_run_is_read_whole_once_it_is_older",
+    ) {
+        return;
+    }
     let f = Folder::new("tailed");
     run_until(f.options(), FOLDER_FIGHTS);
     let was_tailed = f.logs.join("WoWCombatLog-070326.txt");
@@ -600,6 +617,9 @@ fn the_log_tailed_last_run_is_read_whole_once_it_is_older() {
 /// over.
 #[test]
 fn a_deleted_log_drops_out_of_the_manifest() {
+    if crate::test_scratch::process::isolate("a_deleted_log_drops_out_of_the_manifest") {
+        return;
+    }
     let f = Folder::new("deleted");
     run_until(f.options(), FOLDER_FIGHTS);
     let [a, b] = f.older.clone();
@@ -617,6 +637,9 @@ fn a_deleted_log_drops_out_of_the_manifest() {
 /// is.
 #[test]
 fn a_read_short_of_the_files_end_is_not_recorded() {
+    if crate::test_scratch::process::isolate("a_read_short_of_the_files_end_is_not_recorded") {
+        return;
+    }
     let tmp = Temp::new("short");
     let logs = tmp.join("logs");
     std::fs::create_dir_all(&logs).unwrap();
@@ -661,6 +684,9 @@ fn a_read_short_of_the_files_end_is_not_recorded() {
 /// the next start reads them all and records them.
 #[test]
 fn a_read_during_a_failed_write_is_not_recorded() {
+    if crate::test_scratch::process::isolate("a_read_during_a_failed_write_is_not_recorded") {
+        return;
+    }
     let f = Folder::new("failed");
     std::fs::create_dir_all(&f.hist).unwrap();
     std::fs::write(f.hist.join("rows"), "not a folder").unwrap();
@@ -682,6 +708,11 @@ fn a_read_during_a_failed_write_is_not_recorded() {
 /// pull into it late; the next start reads it again and stores the pull.
 #[test]
 fn a_log_the_tailer_left_is_recorded_and_read_again_once_it_grows() {
+    if crate::test_scratch::process::isolate(
+        "a_log_the_tailer_left_is_recorded_and_read_again_once_it_grows",
+    ) {
+        return;
+    }
     let f = Folder::new("left");
     let left = f.logs.join("WoWCombatLog-070326.txt");
     let d = start(f.options());
@@ -729,6 +760,9 @@ fn a_log_the_tailer_left_is_recorded_and_read_again_once_it_grows() {
 /// reads every log, even one that left no fight to miss.
 #[test]
 fn a_manifest_of_another_store_is_discarded() {
+    if crate::test_scratch::process::isolate("a_manifest_of_another_store_is_discarded") {
+        return;
+    }
     let tmp = Temp::new("store");
     let logs = tmp.join("logs");
     std::fs::create_dir_all(&logs).unwrap();
@@ -772,6 +806,11 @@ fn a_manifest_of_another_store_is_discarded() {
 /// still finds its log and rewrites the card.
 #[test]
 fn a_regrade_after_a_restart_finds_a_log_the_sweep_passed_over() {
+    if crate::test_scratch::process::isolate(
+        "a_regrade_after_a_restart_finds_a_log_the_sweep_passed_over",
+    ) {
+        return;
+    }
     let f = Folder::new("regrade");
     run_until(f.options(), FOLDER_FIGHTS);
     let a = &f.older[0];
@@ -800,6 +839,9 @@ fn a_regrade_after_a_restart_finds_a_log_the_sweep_passed_over() {
 /// again after a restart, by the manifest: a regrade of its fight reads it.
 #[test]
 fn an_imported_log_is_found_again_after_a_restart() {
+    if crate::test_scratch::process::isolate("an_imported_log_is_found_again_after_a_restart") {
+        return;
+    }
     let f = Folder::new("imported");
     let elsewhere = f.tmp.join("elsewhere");
     std::fs::create_dir_all(&elsewhere).unwrap();
@@ -861,6 +903,9 @@ fn an_imported_log_is_found_again_after_a_restart() {
 /// alone.
 #[test]
 fn two_editions_each_read_only_what_is_new() {
+    if crate::test_scratch::process::isolate("two_editions_each_read_only_what_is_new") {
+        return;
+    }
     let tmp = Temp::new("editions");
     let (retail, forever) = (tmp.join("retail"), tmp.join("forever"));
     std::fs::create_dir_all(&retail).unwrap();
@@ -926,6 +971,9 @@ fn two_editions_each_read_only_what_is_new() {
 #[test]
 #[ignore = "a measurement: prints the time and bytes of three starts over forty logs"]
 fn measured_three_starts_over_forty_logs() {
+    if crate::test_scratch::process::isolate("measured_three_starts_over_forty_logs") {
+        return;
+    }
     let mb: usize = std::env::var("WOWDPS_SWEEP_MB")
         .ok()
         .and_then(|v| v.parse().ok())
@@ -1019,3 +1067,6 @@ fn resident(paths: &[PathBuf]) -> u64 {
         .filter_map(|l| l.trim().parse::<u64>().ok())
         .sum()
 }
+
+#[path = "../../test-support/scratch.rs"]
+mod test_scratch;
