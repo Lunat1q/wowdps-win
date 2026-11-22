@@ -117,15 +117,15 @@ unsafe extern "system" {
     fn SetForegroundWindow(hwnd: Hwnd) -> i32;
     fn GetCursorPos(pt: *mut Point) -> i32;
     fn PostMessageW(hwnd: Hwnd, msg: u32, w: usize, l: isize) -> i32;
-    fn CreateIcon(
+    fn LoadImageW(
         instance: isize,
+        name: *const u16,
+        kind: u32,
         w: i32,
         h: i32,
-        planes: u8,
-        bits: u8,
-        and: *const u8,
-        xor: *const u8,
+        flags: u32,
     ) -> isize;
+    fn GetSystemMetrics(index: i32) -> i32;
     fn EnumWindows(each: extern "system" fn(Hwnd, isize) -> i32, param: isize) -> i32;
     fn GetWindowThreadProcessId(hwnd: Hwnd, pid: *mut u32) -> u32;
     fn GetWindowTextW(hwnd: Hwnd, text: *mut u16, len: i32) -> i32;
@@ -150,6 +150,9 @@ unsafe extern "system" {
 
 const PROCESS_QUERY_LIMITED_INFORMATION: u32 = 0x1000;
 const SW_RESTORE: i32 = 9;
+const IMAGE_ICON: u32 = 1;
+const SM_CXSMICON: i32 = 49;
+const SM_CYSMICON: i32 = 50;
 
 /// The icon's window, for [`remove`] from the daemon's thread (0: none).
 static WINDOW: AtomicIsize = AtomicIsize::new(0);
@@ -215,9 +218,15 @@ fn run() {
         if hwnd == 0 {
             return;
         }
-        let pixels = icon_pixels();
-        let mask = [0u8; (SIDE * SIDE / 8) as usize];
-        let icon = CreateIcon(instance, SIDE, SIDE, 1, 32, mask.as_ptr(), pixels.as_ptr());
+        // The app icon linked into this exe (build.rs), at the small size.
+        let icon = LoadImageW(
+            instance,
+            std::ptr::without_provenance(1),
+            IMAGE_ICON,
+            GetSystemMetrics(SM_CXSMICON),
+            GetSystemMetrics(SM_CYSMICON),
+            0,
+        );
         let data = icon_data(hwnd, icon);
         if Shell_NotifyIconW(NIM_ADD, &data) == 0 {
             return;
@@ -392,48 +401,9 @@ fn wide(s: &str) -> Vec<u16> {
     s.encode_utf16().chain(std::iter::once(0)).collect()
 }
 
-const SIDE: i32 = 32;
-
-/// The icon, drawn: three rising gold bars on a dark rounded tile, 32 px
-/// BGRA rows top-down (the alpha carries the corners).
-fn icon_pixels() -> Vec<u8> {
-    const RADIUS: i32 = 6;
-    // Each bar's columns and top row; all stand on row 26.
-    const BARS: [(i32, i32, i32); 3] = [(7, 11, 17), (14, 18, 12), (21, 25, 7)];
-    let corner = |v: i32| v.clamp(RADIUS, SIDE - RADIUS - 1);
-    (0..SIDE)
-        .flat_map(|y| (0..SIDE).map(move |x| (x, y)))
-        .flat_map(|(x, y)| {
-            let (dx, dy) = (x - corner(x), y - corner(y));
-            let inside = dx * dx + dy * dy <= RADIUS * RADIUS;
-            let bar = BARS
-                .iter()
-                .any(|&(x0, x1, top)| (x0..x1).contains(&x) && (top..26).contains(&y));
-            match (inside, bar) {
-                (false, _) => [0, 0, 0, 0],
-                (true, true) => [0x4a, 0xb8, 0xe8, 0xff],
-                (true, false) => [0x30, 0x22, 0x1e, 0xff],
-            }
-        })
-        .collect()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn the_icon_is_a_square_of_bgra_pixels_with_clear_corners() {
-        let px = icon_pixels();
-        assert_eq!(px.len(), (SIDE * SIDE * 4) as usize);
-        assert_eq!(&px[..4], &[0, 0, 0, 0], "top-left corner is clear");
-        let at = |x: i32, y: i32| {
-            let i = ((y * SIDE + x) * 4) as usize;
-            px[i..i + 4].to_vec()
-        };
-        assert_eq!(at(16, 2), vec![0x30, 0x22, 0x1e, 0xff], "tile");
-        assert_eq!(at(22, 20), vec![0x4a, 0xb8, 0xe8, 0xff], "tallest bar");
-    }
 
     #[test]
     fn the_struct_is_the_size_windows_expects() {
