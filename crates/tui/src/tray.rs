@@ -1,7 +1,7 @@
 //! The running daemon's tray icon on Windows: a left click opens the meter;
-//! the right-click menu opens it or quits wowdps — every process run from
-//! this binary's folder (the window, the overlay, a TUI, the MCP server),
-//! then the daemon itself. Plain Win32 through `extern "system"`, no crate.
+//! the right-click menu opens it or quits wowdps — every wowdps program
+//! running (the window, the overlay, a TUI, the MCP servers, history and
+//! extraction runs), then the daemon itself. Plain Win32 through `extern "system"`, no crate.
 
 use std::ffi::c_void;
 use std::sync::atomic::{AtomicIsize, Ordering};
@@ -126,6 +126,12 @@ unsafe extern "system" {
         and: *const u8,
         xor: *const u8,
     ) -> isize;
+    fn EnumWindows(each: extern "system" fn(Hwnd, isize) -> i32, param: isize) -> i32;
+    fn GetWindowThreadProcessId(hwnd: Hwnd, pid: *mut u32) -> u32;
+    fn GetWindowTextW(hwnd: Hwnd, text: *mut u16, len: i32) -> i32;
+    fn IsWindowVisible(hwnd: Hwnd) -> i32;
+    fn IsIconic(hwnd: Hwnd) -> i32;
+    fn ShowWindow(hwnd: Hwnd, cmd: i32) -> i32;
 }
 
 #[link(name = "shell32")]
@@ -136,7 +142,14 @@ unsafe extern "system" {
 #[link(name = "kernel32")]
 unsafe extern "system" {
     fn GetModuleHandleW(name: *const u16) -> isize;
+    fn OpenProcess(access: u32, inherit: i32, pid: u32) -> isize;
+    fn QueryFullProcessImageNameW(process: isize, flags: u32, name: *mut u16, len: *mut u32)
+    -> i32;
+    fn CloseHandle(handle: isize) -> i32;
 }
+
+const PROCESS_QUERY_LIMITED_INFORMATION: u32 = 0x1000;
+const SW_RESTORE: i32 = 9;
 
 /// The icon's window, for [`remove`] from the daemon's thread (0: none).
 static WINDOW: AtomicIsize = AtomicIsize::new(0);
@@ -265,30 +278,89 @@ fn menu(hwnd: Hwnd) {
     }
 }
 
+/// Bring the meter window forward when one is open, else start one.
 fn open_meter() {
-    let _ = std::process::Command::new(crate::find_bin("wowdps-gui")).spawn();
+    let gui = crate::find_bin("wowdps-gui");
+    match meter_window(&gui) {
+        // SAFETY: a window handle just found, restored and raised; a
+        // window gone since fails the calls harmlessly.
+        Some(hwnd) => unsafe {
+            if IsIconic(hwnd) != 0 {
+                ShowWindow(hwnd, SW_RESTORE);
+            }
+            SetForegroundWindow(hwnd);
+        },
+        None => {
+            let _ = std::process::Command::new(gui).spawn();
+        }
+    }
 }
 
-/// Every other process run from this binary's folder first — a window or
-/// TUI left running would reconnect and start a daemon again — then this
+/// The visible window titled `wowdps` of a process running `gui`: the
+/// meter window. The overlay's window has no title, and a title alone
+/// would match a folder of that name open in Explorer.
+fn meter_window(gui: &std::path::Path) -> Option<Hwnd> {
+    extern "system" fn each(hwnd: Hwnd, found: isize) -> i32 {
+        // SAFETY: `found` is the `Vec` `meter_window` passes, alive for
+        // the whole enumeration.
+        let found = unsafe { &mut *(found as *mut Vec<Hwnd>) };
+        let mut text = [0u16; 16];
+        // SAFETY: reads of a live window into a buffer of the given size.
+        let titled = unsafe {
+            IsWindowVisible(hwnd) != 0
+                && GetWindowTextW(hwnd, text.as_mut_ptr(), text.len() as i32) == 6
+        };
+        if titled && text.iter().take(6).copied().eq("wowdps".encode_utf16()) {
+            found.push(hwnd);
+        }
+        1
+    }
+    let mut titled: Vec<Hwnd> = Vec::new();
+    // SAFETY: the callback only reads windows and pushes onto `titled`.
+    unsafe { EnumWindows(each, &mut titled as *mut Vec<Hwnd> as isize) };
+    titled
+        .into_iter()
+        .find(|&hwnd| image_of(hwnd).is_some_and(|p| p.eq_ignore_ascii_case(gui.as_os_str())))
+}
+
+/// The full path of the program behind `hwnd`.
+fn image_of(hwnd: Hwnd) -> Option<std::ffi::OsString> {
+    use std::os::windows::ffi::OsStringExt as _;
+    let mut pid = 0u32;
+    // SAFETY: plain queries; the process handle is closed before return.
+    unsafe {
+        GetWindowThreadProcessId(hwnd, &mut pid);
+        let process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
+        if process == 0 {
+            return None;
+        }
+        let mut buf = [0u16; 1024];
+        let mut len = buf.len() as u32;
+        let ok = QueryFullProcessImageNameW(process, 0, buf.as_mut_ptr(), &mut len) != 0;
+        CloseHandle(process);
+        let name = buf.get(..len as usize)?;
+        ok.then(|| std::ffi::OsString::from_wide(name))
+    }
+}
+
+/// The programs Quit stops, wherever each runs from.
+const PROGRAMS: &str = "wowdps,wowdps-gui,wowdps-mcp,wowdps-history,wowdps-extract";
+
+/// Every other wowdps program first, from any folder (the window, the
+/// overlay, a TUI, the MCP servers, a history query, an extraction): a
+/// client left running would reconnect and start a daemon again. Then this
 /// daemon, as `wowdps stop` asks it.
 fn quit() {
     use std::os::windows::process::CommandExt as _;
-    if let Some(dir) = std::env::current_exe()
-        .ok()
-        .and_then(|e| e.parent().map(|d| d.display().to_string()))
-    {
-        let script = format!(
-            "$d = '{}\\'; Get-Process | Where-Object {{ $_.Id -ne {} -and $_.Path -and \
-             $_.Path.StartsWith($d, [StringComparison]::OrdinalIgnoreCase) }} | Stop-Process -Force",
-            dir.replace('\'', "''"),
-            std::process::id()
-        );
-        let _ = std::process::Command::new("powershell")
-            .args(["-NoProfile", "-NonInteractive", "-Command", &script])
-            .creation_flags(CREATE_NO_WINDOW)
-            .status();
-    }
+    let script = format!(
+        "Get-Process -Name {PROGRAMS} -ErrorAction SilentlyContinue | \
+         Where-Object {{ $_.Id -ne {} }} | Stop-Process -Force",
+        std::process::id()
+    );
+    let _ = std::process::Command::new("powershell")
+        .args(["-NoProfile", "-NonInteractive", "-Command", &script])
+        .creation_flags(CREATE_NO_WINDOW)
+        .status();
     crate::ask_stop();
 }
 
