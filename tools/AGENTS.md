@@ -136,6 +136,8 @@ tools/gen-spell-icons.sh --product wowf -o ~/.local/share/wowdps/forever/spell-i
 tools/gen-talent-art.sh        # talent-art.bin (~60 MiB)
 tools/gen-spell-tips.sh        # spell-tips.bin (gui-logic's spell tips; ~7 s, 4 s when current)
 tools/gen-emblems.sh           # edition-emblems.bin (each game's emblem, from the launcher's own files)
+wowdps-extract setup           # every art cache above at once, no shell or upscaler (curl fetches);
+                               # wowdps-gui runs it from beside itself when a cache is missing
 tools/seed-creatures.sh        # NPC classifications from Wowhead into the store's creatures.tsv, under the addon's
 ```
 

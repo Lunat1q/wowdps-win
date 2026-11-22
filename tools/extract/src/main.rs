@@ -4,11 +4,12 @@
 
 mod cli;
 
+use std::path::Path;
 use std::process::ExitCode;
 
 use cli::args::Args;
 use cli::{Cmd, caches, creatures, db2, tablegen};
-use wowdps_extract::command::{Commands, tables_cmd};
+use wowdps_extract::command::{Commands, cmd, make_dir, tables_cmd};
 
 fn main() -> ExitCode {
     EXTRACT.main()
@@ -26,11 +27,104 @@ static EXTRACT: Commands = Commands {
     ],
 };
 
-/// The commands `main.rs` answers itself: about the others.
-const MAIN: &[Cmd] = &[tables_cmd(tables)];
+/// The commands `main.rs` answers itself: about the others, and `setup`,
+/// which runs them.
+const MAIN: &[Cmd] = &[
+    tables_cmd(tables),
+    cmd(
+        "setup",
+        "setup   (every art cache the GUI draws, Retail's: what the gen-*.sh scripts do, without the upscaler)",
+        setup,
+    ),
+];
 
 fn tables(a: Args) -> Result<(), String> {
     EXTRACT.tables(a)
+}
+
+/// The art caches `setup` makes, in order, each its command on its
+/// defaults: the install found as every command finds it, the cache
+/// written in the data home.
+const ART: &[&str] = &[
+    "gen-icons",
+    "gen-spell-icons",
+    "gen-spell-tips",
+    "gen-talent-art",
+    "gen-emblems",
+];
+
+const DBD_URL: &str = "https://raw.githubusercontent.com/wowdev/WoWDBDefs/master/definitions/";
+const KEYS_URL: &str = "https://raw.githubusercontent.com/wowdev/TACTKeys/master/WoW.txt";
+
+/// `setup`: tools/lib.sh's fetches and every art generator, for a machine
+/// with no checkout or shell (the Windows build's first start). One
+/// generator failing does not stop the rest.
+fn setup(a: Args) -> Result<(), String> {
+    a.finish()?;
+    let work = std::env::temp_dir().join(format!("wowdps-setup-{}", std::process::id()));
+    make_dir(&work)?;
+    let ran = setup_in(&work);
+    let _ = std::fs::remove_dir_all(&work);
+    ran
+}
+
+fn setup_in(work: &Path) -> Result<(), String> {
+    let keys = work.join("tactkeys.txt");
+    println!("fetching the TACT keys...");
+    fetch(KEYS_URL, &keys)?;
+    let mut failed = Vec::new();
+    for (i, name) in ART.iter().enumerate() {
+        println!("[{}/{}] {name}...", i + 1, ART.len());
+        if let Err(e) = setup_one(name, work, &keys) {
+            eprintln!("{name}: {e}");
+            failed.push(*name);
+        }
+    }
+    match failed.is_empty() {
+        true => Ok(()),
+        false => Err(format!("failed: {}", failed.join(", "))),
+    }
+}
+
+fn setup_one(name: &str, work: &Path, keys: &Path) -> Result<(), String> {
+    let c = EXTRACT
+        .find(name)
+        .ok_or_else(|| format!("no command {name}"))?;
+    let tables = c.table_names();
+    let mut words = Vec::new();
+    if !tables.is_empty() {
+        for t in &tables {
+            let dbd = work.join(format!("{t}.dbd"));
+            if !dbd.exists() {
+                fetch(&format!("{DBD_URL}{t}.dbd"), &dbd)?;
+            }
+        }
+        words = vec![
+            "--dbd-dir".to_string(),
+            work.display().to_string(),
+            "--keys".to_string(),
+            keys.display().to_string(),
+        ];
+    }
+    (c.run)(EXTRACT.args(words, c))
+}
+
+/// `url` into `to` through curl, which Windows 10 and later, macOS and
+/// every Linux desktop carry: the extractor stays stdlib-only.
+fn fetch(url: &str, to: &Path) -> Result<(), String> {
+    let out = std::process::Command::new("curl")
+        .args(["-sSfL", "-o"])
+        .arg(to)
+        .arg(url)
+        .output()
+        .map_err(|e| format!("running curl: {e}"))?;
+    match out.status.success() {
+        true => Ok(()),
+        false => Err(format!(
+            "fetching {url}: {}",
+            String::from_utf8_lossy(&out.stderr).trim()
+        )),
+    }
 }
 
 #[cfg(test)]

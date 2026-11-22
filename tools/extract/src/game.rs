@@ -38,7 +38,7 @@ pub fn locate() -> Result<PathBuf, String> {
         return Ok(dir.to_path_buf());
     }
 
-    let found = std::env::var_os("HOME")
+    let found = wowdps_proto::dirs::home()
         .map(|h| wowdps_core::cli::discover_wow_installs(Path::new(&h)))
         .unwrap_or_default();
     match found.as_slice() {

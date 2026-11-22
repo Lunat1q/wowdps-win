@@ -133,6 +133,12 @@ fn main() -> ExitCode {
         // surfaces never stand at once.
         wowdps_gui_logic::single::claim_overlay();
     }
+    // First start of a build that ships the extractor: the art caches,
+    // made from the install before the window opens and reads them. The
+    // overlay never waits on it; it draws without art until the next start.
+    if !overlay && let Some(extract) = wowdps_gui_logic::sibling::art_setup() {
+        run_art_setup(&extract);
+    }
     // The link is made before the app starts, as the iced GUI's is:
     // `connect` may spawn a daemon and wait for it, a wait the UI thread
     // must never take once frames are drawing.
@@ -178,6 +184,38 @@ fn main() -> ExitCode {
             ExitCode::FAILURE
         }
         None => ExitCode::SUCCESS,
+    }
+}
+
+/// `wowdps-extract setup`, waited for. On Windows through `start`, so it
+/// gets a console window of its own showing its progress: a GUI process has
+/// no console, and a child given its null handles prints nowhere. A failure
+/// is said and the window opens without art; the next start tries again.
+fn run_art_setup(extract: &std::path::Path) {
+    let mut cmd;
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt as _;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        // cmd parses its own quotes, not the C runtime's: written raw.
+        cmd = std::process::Command::new("cmd");
+        cmd.raw_arg(format!(
+            "/c start \"wowdps: extracting game art\" /wait \"{}\" setup",
+            extract.display()
+        ))
+        .creation_flags(CREATE_NO_WINDOW);
+    }
+    #[cfg(not(windows))]
+    {
+        cmd = std::process::Command::new(extract);
+        cmd.arg("setup");
+    }
+    if let Err(e) = cmd.status() {
+        let _ = writeln!(
+            std::io::stderr(),
+            "wowdps-gui: running {} setup: {e}",
+            extract.display()
+        );
     }
 }
 
