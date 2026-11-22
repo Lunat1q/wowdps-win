@@ -554,6 +554,7 @@ pub(crate) mod tests {
     /// The real spawner against real processes: a child's stderr is kept
     /// for the failure report, a living child can be terminated, and a
     /// binary that is not there is a spawn error.
+    #[cfg(unix)]
     #[test]
     fn the_gui_spawner_runs_the_binary_keeps_stderr_and_terminates() {
         use std::os::unix::fs::PermissionsExt;
@@ -639,6 +640,7 @@ pub(crate) mod tests {
     /// Config `gui_binary` through the supervisor: a bare name beside the
     /// daemon runs that sibling, one not beside it is looked up on `$PATH`,
     /// and one on neither fails naming what it tried.
+    #[cfg(unix)]
     #[test]
     fn a_named_gui_binary_spawns_beside_the_daemon_else_from_path() {
         use crate::config::Config;
@@ -705,6 +707,7 @@ pub(crate) mod tests {
     /// all, a game returning while the child still lives, and a real
     /// child's stderr surfacing through the supervisor — trimmed to its
     /// tail when it spews.
+    #[cfg(unix)]
     #[test]
     fn supervisor_edges_no_spawner_returning_game_and_real_stderr() {
         use std::os::unix::fs::PermissionsExt;

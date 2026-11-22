@@ -950,6 +950,10 @@ fn measure_in(
     target_os = "macos",
     ignore = "gpui's mac platform must be created on the main thread"
 )]
+#[cfg_attr(
+    windows,
+    ignore = "GPUI's headless Windows text system lists no in-memory font, so text falls back"
+)]
 fn a_badge_keeps_the_switch_s_rhythm() {
     for (frame, w, h) in super::super::shots::SIZES {
         let marks = measure((w, h), None);
@@ -1155,6 +1159,10 @@ fn bar_at(
 #[cfg_attr(
     target_os = "macos",
     ignore = "gpui's mac platform must be created on the main thread"
+)]
+#[cfg_attr(
+    windows,
+    ignore = "GPUI's headless Windows text system lists no in-memory font, so text falls back"
 )]
 fn the_bar_never_runs_past_the_window_with_the_switch() {
     use wowdps_proto::history::FightCard;

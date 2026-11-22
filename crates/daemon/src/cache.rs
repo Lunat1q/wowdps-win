@@ -13,10 +13,10 @@
 
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
-use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 
 use wowdps_core::index::{self, Index, ScanState, SegmentMeta};
+use wowdps_core::tail::file_id;
 use wowdps_model::Edition;
 use wowdps_proto::wire::{self, Reader};
 
@@ -82,7 +82,7 @@ impl IndexCache {
         let base = std::env::var_os("XDG_CACHE_HOME")
             .filter(|v| !v.is_empty())
             .map(PathBuf::from)
-            .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".cache")))?;
+            .or_else(|| wowdps_proto::dirs::home().map(|h| PathBuf::from(h).join(".cache")))?;
         Some(base.join("wowdps/index"))
     }
 
@@ -116,7 +116,7 @@ impl IndexCache {
         let (dev, ino, check_len, checksum, state) = decode(&bytes)?;
 
         let meta = file.metadata().ok()?;
-        if meta.dev() != dev || meta.ino() != ino || meta.len() < state.offset {
+        if file_id(&meta) != (dev, ino) || meta.len() < state.offset {
             return None;
         }
         // `check_len` came off disk too: a corrupt entry must not underflow
@@ -154,8 +154,9 @@ impl IndexCache {
 
         let mut buf = Vec::new();
         buf.extend_from_slice(MAGIC);
-        wire::put_u64(&mut buf, meta.dev());
-        wire::put_u64(&mut buf, meta.ino());
+        let (dev, ino) = file_id(&meta);
+        wire::put_u64(&mut buf, dev);
+        wire::put_u64(&mut buf, ino);
         wire::put_u64(&mut buf, check_len);
         wire::put_u64(&mut buf, checksum);
         wire::put_u64(&mut buf, state.offset);
@@ -748,7 +749,7 @@ mod tests {
         );
         unsafe { std::env::set_var("XDG_CACHE_HOME", "") };
         let fallback = IndexCache::default_dir();
-        match std::env::var_os("HOME") {
+        match wowdps_proto::dirs::home() {
             Some(home) => assert_eq!(
                 fallback,
                 Some(PathBuf::from(home).join(".cache/wowdps/index"))

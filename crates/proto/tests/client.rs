@@ -2,11 +2,15 @@
 //! the coalescing guarantee — a stalled reader catches up to the newest
 //! snapshot per cursor, never a backlog.
 
+// The spawning and reconnect test is unix's (it spawns /bin/sh); its imports
+// go unused elsewhere.
+#![cfg_attr(not(unix), allow(unused_imports))]
+
 use std::io::Write;
-use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
+use wowdps_proto::sock::{self, Listener, Stream};
 
 use wowdps_model::{SegmentInfo, SegmentKind, View};
 use wowdps_proto::msg::Cursor;
@@ -60,7 +64,7 @@ fn list(seq: u64) -> DaemonMsg {
 
 #[test]
 fn a_stalled_client_receives_the_newest_snapshots_not_a_backlog() {
-    let (ours, theirs) = UnixStream::pair().unwrap();
+    let (ours, theirs) = sock::pair().unwrap();
 
     let server = std::thread::spawn(move || {
         let mut s = theirs;
@@ -176,9 +180,9 @@ fn compare(seq: u64, status: &str) -> DaemonMsg {
 /// Handshake a scripted peer and hand back the served side. Result-shaped
 /// because a free helper in an integration test is not "in tests" to
 /// clippy's expect ban — callers unwrap inside their `#[test]` fn.
-fn served_client(kind: ClientKind) -> std::io::Result<(DaemonClient, UnixStream)> {
-    let (ours, theirs) = UnixStream::pair()?;
-    let server = std::thread::spawn(move || -> std::io::Result<UnixStream> {
+fn served_client(kind: ClientKind) -> std::io::Result<(DaemonClient, Stream)> {
+    let (ours, theirs) = sock::pair()?;
+    let server = std::thread::spawn(move || -> std::io::Result<Stream> {
         let mut s = theirs;
         let (tag, body) = wire::read_frame(&mut s)?;
         if !matches!(ClientMsg::decode(tag, &body), Ok(ClientMsg::Hello { .. })) {
@@ -210,7 +214,7 @@ fn wait_dead(client: &mut DaemonClient) {
 
 #[test]
 fn a_bad_handshake_reply_is_an_error_not_a_hang() {
-    let (ours, theirs) = UnixStream::pair().unwrap();
+    let (ours, theirs) = sock::pair().unwrap();
     std::thread::spawn(move || {
         let mut s = theirs;
         let _ = wire::read_frame(&mut s);
@@ -228,7 +232,7 @@ fn a_bad_handshake_reply_is_an_error_not_a_hang() {
 /// can only happen to a misbuilt daemon, and it must fail loudly.
 #[test]
 fn a_wrong_proto_hello_ack_is_rejected() {
-    let (ours, theirs) = UnixStream::pair().expect("socketpair");
+    let (ours, theirs) = sock::pair().expect("socketpair");
     std::thread::spawn(move || {
         let mut s = theirs;
         let _ = wire::read_frame(&mut s);
@@ -332,6 +336,7 @@ fn reconnecting_is_refused_without_a_daemon_binary() {
 /// never listens times out; a listener that appears late is found by the
 /// retry loop; and a dead watching client respawns, re-handshakes, and
 /// re-declares its cursor unprompted.
+#[cfg(unix)]
 #[test]
 fn spawning_reconnecting_and_squatted_dirs() {
     if crate::test_scratch::process::isolate("spawning_reconnecting_and_squatted_dirs") {
@@ -371,7 +376,7 @@ fn spawning_reconnecting_and_squatted_dirs() {
         let path = path.clone();
         std::thread::spawn(move || {
             std::thread::sleep(Duration::from_millis(150));
-            UnixListener::bind(&path).expect("late bind")
+            sock::bind(&path).expect("late bind")
         })
     };
     assert!(
@@ -385,8 +390,8 @@ fn spawning_reconnecting_and_squatted_dirs() {
     // keeps a clone of each accepted conn so the test can hang up on demand.
     // Serving is a function so a second one can come back at the same path.
     type Seen = std::sync::mpsc::Receiver<ClientMsg>;
-    type Conns = Arc<Mutex<Vec<UnixStream>>>;
-    fn fake_daemon(listener: UnixListener) -> (Seen, Conns) {
+    type Conns = Arc<Mutex<Vec<Stream>>>;
+    fn fake_daemon(listener: Listener) -> (Seen, Conns) {
         let (seen_tx, seen_rx) = std::sync::mpsc::channel::<ClientMsg>();
         let conns: Conns = Arc::new(Mutex::new(Vec::new()));
         let conns_for_daemon = Arc::clone(&conns);
@@ -437,7 +442,7 @@ fn spawning_reconnecting_and_squatted_dirs() {
             }
         }
     }
-    let (seen_rx, conns) = fake_daemon(UnixListener::bind(&path).expect("bind"));
+    let (seen_rx, conns) = fake_daemon(sock::bind(&path).expect("bind"));
     let expect_watch = |what: &str| expect_watch_on(&seen_rx, what);
 
     // connect() takes the fast path: a listener exists, nothing is spawned.
@@ -499,7 +504,7 @@ fn spawning_reconnecting_and_squatted_dirs() {
 
     // A daemon comes back at the path: the next tick connects, handshakes,
     // re-declares the cursor, and the client is alive again.
-    let (seen_rx2, _conns2) = fake_daemon(UnixListener::bind(&path).expect("rebind"));
+    let (seen_rx2, _conns2) = fake_daemon(sock::bind(&path).expect("rebind"));
     assert!(
         matches!(client.try_reconnect(), Reconnect::Connected),
         "a listener is back: the tick connects"

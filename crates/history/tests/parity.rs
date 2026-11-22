@@ -10,11 +10,11 @@
 )]
 
 use std::collections::HashMap;
-use std::os::unix::net::UnixStream;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 use std::thread;
 use std::time::{Duration, Instant};
+use wowdps_proto::sock;
 
 use wowdps_core::tail::SourceSpec;
 use wowdps_daemon::history::{HistoryOptions, MemBackend, Retention, Store};
@@ -172,7 +172,7 @@ fn start_over_with(
     loop {
         // The socket's vnode appears at bind(); listen() follows. A connect
         // in that gap is refused, so readiness is a connect, not exists().
-        if UnixStream::connect(&socket).is_ok() {
+        if sock::connect(&socket).is_ok() {
             break;
         }
         assert!(Instant::now() < deadline, "daemon never bound");
@@ -446,8 +446,7 @@ fn the_daemon_and_sql_agree_over_the_same_lake() {
     }
     let tmp = Temp::new("parity");
     let (socket, hist, _done) = start(&tmp);
-    let mut client =
-        DaemonClient::over(UnixStream::connect(&socket).unwrap(), ClientKind::Mcp).unwrap();
+    let mut client = DaemonClient::over(sock::connect(&socket).unwrap(), ClientKind::Mcp).unwrap();
     wait_for_store(&mut client, 2);
 
     let lake = Lake::open(&hist).expect("lake opens");
@@ -1471,8 +1470,7 @@ fn the_taken_views_answer_the_r17_fixture() {
     }
     let tmp = Temp::new("taken");
     let (socket, hist, _done) = start_over(&tmp, TAKEN_FIXTURE);
-    let mut client =
-        DaemonClient::over(UnixStream::connect(&socket).unwrap(), ClientKind::Mcp).unwrap();
+    let mut client = DaemonClient::over(sock::connect(&socket).unwrap(), ClientKind::Mcp).unwrap();
     wait_for_store(&mut client, 1);
 
     let lake = Lake::open(&hist).expect("lake opens");
@@ -2294,8 +2292,7 @@ fn the_support_views_answer_the_r19_fixture() {
     }
     let tmp = Temp::new("support");
     let (socket, hist, _done) = start_over(&tmp, SUPPORT_FIXTURE);
-    let mut client =
-        DaemonClient::over(UnixStream::connect(&socket).unwrap(), ClientKind::Mcp).unwrap();
+    let mut client = DaemonClient::over(sock::connect(&socket).unwrap(), ClientKind::Mcp).unwrap();
     // The trash tail (2 s, Σ effective 14 000) is not stored: `store_trash`
     // is off, so the lake is the one kill.
     wait_for_store(&mut client, 1);
@@ -3318,8 +3315,7 @@ fn the_span_views_answer_the_r18_fixture() {
     }
     let tmp = Temp::new("spans");
     let (socket, hist, _done) = start_over(&tmp, SPANS_FIXTURE);
-    let mut client =
-        DaemonClient::over(UnixStream::connect(&socket).unwrap(), ClientKind::Mcp).unwrap();
+    let mut client = DaemonClient::over(sock::connect(&socket).unwrap(), ClientKind::Mcp).unwrap();
     // The trash tail is not stored (`store_trash` off): the lake is the kill.
     wait_for_store(&mut client, 1);
 
@@ -4122,8 +4118,7 @@ fn daemon_lake(tmp: &Temp, fixture: &str, fights: u32) -> PathBuf {
 
 fn daemon_lake_with(tmp: &Temp, fixture: &str, fights: u32, addon_dir: Option<PathBuf>) -> PathBuf {
     let (socket, hist, _done) = start_over_with(tmp, fixture, addon_dir);
-    let mut client =
-        DaemonClient::over(UnixStream::connect(&socket).unwrap(), ClientKind::Mcp).unwrap();
+    let mut client = DaemonClient::over(sock::connect(&socket).unwrap(), ClientKind::Mcp).unwrap();
     wait_for_store(&mut client, fights);
     client.send(&ClientMsg::Shutdown);
     hist
@@ -4295,8 +4290,7 @@ fn the_stack_views_answer_the_r21_fixture() {
     }
     let tmp = Temp::new("stacks");
     let (socket, hist, _done) = start_over(&tmp, STACKS_FIXTURE);
-    let mut client =
-        DaemonClient::over(UnixStream::connect(&socket).unwrap(), ClientKind::Mcp).unwrap();
+    let mut client = DaemonClient::over(sock::connect(&socket).unwrap(), ClientKind::Mcp).unwrap();
     wait_for_store(&mut client, 1);
 
     let lake = Lake::open(&hist).expect("lake opens");
@@ -4720,8 +4714,7 @@ fn the_shield_views_answer_the_r20_fixture() {
     }
     let tmp = Temp::new("shields");
     let (socket, hist, _done) = start_over(&tmp, SHIELDS_FIXTURE);
-    let mut client =
-        DaemonClient::over(UnixStream::connect(&socket).unwrap(), ClientKind::Mcp).unwrap();
+    let mut client = DaemonClient::over(sock::connect(&socket).unwrap(), ClientKind::Mcp).unwrap();
     // The trash tail is not stored (`store_trash` off): the lake is the kill.
     wait_for_store(&mut client, 1);
 
@@ -5613,8 +5606,7 @@ fn role_night_folds_by_the_mode_role_in_both_readers() {
     // kill beside them.
     let (socket, hist_used, _done) = start_over(&tmp, SHIELDS_FIXTURE);
     assert_eq!(hist_used, hist);
-    let mut client =
-        DaemonClient::over(UnixStream::connect(&socket).unwrap(), ClientKind::Mcp).unwrap();
+    let mut client = DaemonClient::over(sock::connect(&socket).unwrap(), ClientKind::Mcp).unwrap();
     wait_for_store(&mut client, 1 + u32::try_from(pulls.len()).unwrap());
     let lake = Lake::open(&hist).expect("lake opens");
 
@@ -6015,8 +6007,7 @@ fn the_replay_tier_exports_offline_and_stats_count_it() {
     }
     let tmp = Temp::new("replay");
     let (socket, hist, _done) = start(&tmp);
-    let mut client =
-        DaemonClient::over(UnixStream::connect(&socket).unwrap(), ClientKind::Mcp).unwrap();
+    let mut client = DaemonClient::over(sock::connect(&socket).unwrap(), ClientKind::Mcp).unwrap();
     wait_for_store(&mut client, 2);
     let deadline = Instant::now() + DEADLINE;
     let replays = || {
@@ -6116,8 +6107,7 @@ fn an_imported_fight_is_a_column_and_out_of_the_fixed_questions() {
 
     let tmp = Temp::new("imported");
     let (socket, hist, _done) = start(&tmp);
-    let mut client =
-        DaemonClient::over(UnixStream::connect(&socket).unwrap(), ClientKind::Mcp).unwrap();
+    let mut client = DaemonClient::over(sock::connect(&socket).unwrap(), ClientKind::Mcp).unwrap();
     wait_for_store(&mut client, 2);
     let deadline = Instant::now() + DEADLINE;
     let cards = loop {
@@ -6438,7 +6428,7 @@ fn parity_socket_fits_when_the_system_temp_path_is_long() {
             socket.as_os_str().len() < capacity,
             "socket path: {socket:?}"
         );
-        let bound = std::os::unix::net::UnixListener::bind(&socket);
+        let bound = sock::bind(&socket);
         assert!(bound.is_ok(), "bind {socket:?}: {bound:?}");
         return;
     }

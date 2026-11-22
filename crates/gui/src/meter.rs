@@ -174,6 +174,10 @@ mod tests {
         target_os = "macos",
         ignore = "gpui's mac platform must be created on the main thread"
     )]
+    #[cfg_attr(
+        windows,
+        ignore = "GPUI's headless Windows text system lists no in-memory font, so text falls back"
+    )]
     fn a_row_lays_out_real_text() {
         let mut cx = testkit::headless();
         let (window, probe) = testkit::open_headless(&mut cx, size(px(420.), px(320.)), |_, cx| {

@@ -4,7 +4,6 @@
 
 use std::fs::{self, File};
 use std::io::{Read, Seek, SeekFrom};
-use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 use std::thread;
@@ -186,7 +185,7 @@ impl Tailer {
         match File::open(path) {
             Ok(mut file) => {
                 let meta = file.metadata();
-                let (dev, ino) = meta.as_ref().map(|m| (m.dev(), m.ino())).unwrap_or((0, 0));
+                let (dev, ino) = meta.as_ref().map(file_id).unwrap_or((0, 0));
                 let file_age_ms = meta
                     .ok()
                     .and_then(|m| m.modified().ok())
@@ -253,7 +252,7 @@ impl Tailer {
         // Detect replace-in-place and truncation before reading.
         match fs::metadata(&open.path) {
             Ok(m) => {
-                if m.dev() != open.dev || m.ino() != open.ino || m.len() < open.offset {
+                if file_id(&m) != (open.dev, open.ino) || m.len() < open.offset {
                     let path = open.path.clone();
                     self.retarget(&path, out);
                 }
@@ -382,6 +381,25 @@ pub fn spawn(spec: SourceSpec) -> mpsc::Receiver<TailEvent> {
         }
     });
     rx
+}
+
+/// A file's identity, so a file replaced at the same path is told from the
+/// one opened: (device, inode) on unix. Windows' file index is unstable in
+/// std, so there it is (0, creation time).
+// ponytail: creation time survives NTFS "tunneling" (a delete and recreate
+// under the same name within 15 s keeps it); the length check still catches
+// the common replace. Use the file index once std stabilizes it.
+pub fn file_id(m: &fs::Metadata) -> (u64, u64) {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        (m.dev(), m.ino())
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        (0, m.creation_time())
+    }
 }
 
 #[cfg(test)]
@@ -907,6 +925,7 @@ mod tests {
 
     /// A file that exists but cannot be opened: the open error is reported
     /// once and nothing is read until it becomes readable.
+    #[cfg(unix)]
     #[test]
     fn an_unopenable_file_reports_once_then_opens_when_permitted() {
         use std::os::unix::fs::PermissionsExt;

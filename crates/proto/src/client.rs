@@ -5,24 +5,42 @@
 
 use std::collections::VecDeque;
 use std::io::{self, Write};
+#[cfg(unix)]
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
-use std::os::unix::net::UnixStream;
-use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
+#[cfg(unix)]
+use std::sync::OnceLock;
+#[cfg(unix)]
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use crate::msg::{ClientKind, ClientMsg, Cursor, DaemonMsg, EditionRef, PROTO_VERSION};
+use crate::sock::{self, Stream};
 use crate::wire;
 
 /// The directory the socket (and the daemon's lockfile) live in:
-/// `$XDG_RUNTIME_DIR/wowdps`, else `/tmp/wowdps-<uid>`.
+/// `$XDG_RUNTIME_DIR/wowdps`, else `/tmp/wowdps-<uid>` (Windows:
+/// `%LOCALAPPDATA%\wowdps\run`, private to the user by its ACL).
 pub fn socket_dir() -> PathBuf {
     match std::env::var_os("XDG_RUNTIME_DIR") {
         Some(dir) if !dir.is_empty() => PathBuf::from(dir).join("wowdps"),
-        _ => PathBuf::from(format!("/tmp/wowdps-{}", uid())),
+        _ => fallback_socket_dir(),
     }
+}
+
+#[cfg(unix)]
+fn fallback_socket_dir() -> PathBuf {
+    PathBuf::from(format!("/tmp/wowdps-{}", uid()))
+}
+
+#[cfg(windows)]
+fn fallback_socket_dir() -> PathBuf {
+    std::env::var_os("LOCALAPPDATA")
+        .map(PathBuf::from)
+        .unwrap_or_else(std::env::temp_dir)
+        .join("wowdps")
+        .join("run")
 }
 
 /// `<socket_dir>/wowdps-v<PROTO_VERSION>.sock`.
@@ -30,8 +48,18 @@ pub fn socket_path() -> PathBuf {
     socket_dir().join(format!("wowdps-v{PROTO_VERSION}.sock"))
 }
 
+/// Create the socket dir (Windows: under the user's own app data, which
+/// its ACL already keeps private).
+#[cfg(windows)]
+pub fn prepare_socket_dir() -> io::Result<PathBuf> {
+    let dir = socket_dir();
+    std::fs::create_dir_all(&dir)?;
+    Ok(dir)
+}
+
 /// Create the socket dir 0700 and verify it is really ours — a pre-existing
 /// dir owned by someone else (a squatted `/tmp` name) is refused, not used.
+#[cfg(unix)]
 pub fn prepare_socket_dir() -> io::Result<PathBuf> {
     let dir = socket_dir();
     match std::fs::create_dir(&dir) {
@@ -63,6 +91,7 @@ pub fn prepare_socket_dir() -> io::Result<PathBuf> {
 /// definition (`probe_uid`). Unwritable temp leaves 0 for the process,
 /// which fails ownership checks closed — a foreign dir is refused, never
 /// adopted.
+#[cfg(unix)]
 fn uid() -> u32 {
     static UID: OnceLock<u32> = OnceLock::new();
     *UID.get_or_init(|| {
@@ -76,6 +105,7 @@ fn uid() -> u32 {
 
 /// Names `probe_uid` tries before it gives up on 0: enough to step past
 /// the leftovers of a few crashed processes that had our pid.
+#[cfg(unix)]
 const UID_PROBE_TRIES: u32 = 16;
 
 /// The owner of a file created in `dir`. Each try takes a name no other
@@ -83,6 +113,7 @@ const UID_PROBE_TRIES: u32 = 16;
 /// it exclusively, so a stale or planted path (a symlink included) is
 /// never followed or truncated: a name that exists moves on to the next.
 /// 0 when no try can create its file.
+#[cfg(unix)]
 fn probe_uid(dir: &Path, attempt: &AtomicU64) -> u32 {
     let pid = std::process::id();
     for _ in 0..UID_PROBE_TRIES {
@@ -116,16 +147,16 @@ pub enum SourceArg {
 
 /// Connect to the daemon, spawning one if none is listening. Failure is
 /// fatal to the caller — there is no embedded fallback.
-pub fn ensure_daemon(daemon_bin: &Path, source: Option<&SourceArg>) -> io::Result<UnixStream> {
+pub fn ensure_daemon(daemon_bin: &Path, source: Option<&SourceArg>) -> io::Result<Stream> {
     let path = socket_path();
-    if let Ok(stream) = UnixStream::connect(&path) {
+    if let Ok(stream) = sock::connect(&path) {
         return Ok(stream);
     }
     spawn_daemon(daemon_bin, source)?;
 
     let deadline = Instant::now() + Duration::from_secs(3);
     loop {
-        match UnixStream::connect(&path) {
+        match sock::connect(&path) {
             Ok(stream) => return Ok(stream),
             Err(e) if Instant::now() >= deadline => {
                 return Err(io::Error::new(
@@ -160,9 +191,26 @@ fn spawn_daemon(daemon_bin: &Path, source: Option<&SourceArg>) -> io::Result<()>
     }
     cmd.stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .process_group(0);
+        .stderr(std::process::Stdio::null());
+    detach(&mut cmd);
     cmd.spawn().map(drop)
+}
+
+/// Its own process group, so the caller's terminal's ^C never reaches it.
+#[cfg(unix)]
+fn detach(cmd: &mut std::process::Command) {
+    use std::os::unix::process::CommandExt;
+    cmd.process_group(0);
+}
+
+/// No console and its own process group, so it neither flashes a window
+/// nor dies with the console of the client that spawned it.
+#[cfg(windows)]
+fn detach(cmd: &mut std::process::Command) {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    cmd.creation_flags(CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW);
 }
 
 /// How long `try_reconnect` waits before spawning ANOTHER daemon when the
@@ -232,7 +280,7 @@ impl Inbox {
 /// One connection to the daemon: writes on the caller's thread, reads on a
 /// background thread into the coalescing inbox.
 pub struct DaemonClient {
-    stream: UnixStream,
+    stream: Stream,
     inbox: Arc<Mutex<Inbox>>,
     daemon_bin: PathBuf,
     source: Option<SourceArg>,
@@ -270,7 +318,7 @@ impl DaemonClient {
     }
 
     /// Handshake over an already-connected stream (tests, `--status`).
-    pub fn over(stream: UnixStream, kind: ClientKind) -> io::Result<Self> {
+    pub fn over(stream: Stream, kind: ClientKind) -> io::Result<Self> {
         let inbox = handshake(&stream, kind)?;
         Ok(Self {
             stream,
@@ -362,7 +410,7 @@ impl DaemonClient {
         if self.daemon_bin.as_os_str().is_empty() {
             return Reconnect::Failed("no daemon binary to respawn".to_string());
         }
-        match UnixStream::connect(socket_path()) {
+        match sock::connect(socket_path()) {
             Ok(stream) => match handshake(&stream, self.kind) {
                 Ok(inbox) => {
                     self.adopt(stream, inbox);
@@ -391,7 +439,7 @@ impl DaemonClient {
     /// Take a fresh, handshaken connection over: the old stream drops (its
     /// reader thread ends with it), the cursor is re-declared, the respawn
     /// throttle is reset.
-    fn adopt(&mut self, stream: UnixStream, inbox: Arc<Mutex<Inbox>>) {
+    fn adopt(&mut self, stream: Stream, inbox: Arc<Mutex<Inbox>>) {
         self.stream = stream;
         self.inbox = inbox;
         self.dead = false;
@@ -404,7 +452,7 @@ impl DaemonClient {
 }
 
 /// Hello → HelloAck (bounded wait), then the reader thread takes the stream.
-fn handshake(stream: &UnixStream, kind: ClientKind) -> io::Result<Arc<Mutex<Inbox>>> {
+fn handshake(stream: &Stream, kind: ClientKind) -> io::Result<Arc<Mutex<Inbox>>> {
     let mut writer = stream.try_clone()?;
     writer.write_all(
         &ClientMsg::Hello {
@@ -472,6 +520,7 @@ mod tests {
         assert_eq!(name, format!("wowdps-v{PROTO_VERSION}.sock"));
     }
 
+    #[cfg(unix)]
     #[test]
     fn preparing_the_dir_makes_it_private_to_us() {
         // Point the dir somewhere disposable for the duration of this test.
@@ -487,6 +536,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&tmp);
     }
 
+    #[cfg(unix)]
     #[test]
     fn the_uid_probe_steps_past_leftovers_and_agrees_across_threads() {
         let dir =

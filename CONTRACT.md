@@ -681,7 +681,11 @@ when the backlog drains; `Lines` after it are fresh combat.
 Transport: unix socket `$XDG_RUNTIME_DIR/wowdps/wowdps-v<PROTO_VERSION>.sock`
 (fallback `/tmp/wowdps-<uid>/`, dir 0700, ownership verified). The version lives
 in the socket *name*: version skew is structurally impossible — a new client
-spawns its own daemon and the old one idle-exits.
+spawns its own daemon and the old one idle-exits. Windows (std has no unix
+sockets there): loopback TCP on a port the OS picks; the socket path (fallback
+dir `%LOCALAPPDATA%\wowdps\run`) is a file holding `<port> <token>`, the token
+32 hex digits, which a client sends before its first frame and without which
+the daemon drops the connection (`proto::sock`). Frames are the same bytes.
 
 Framing: `u32 len (LE) | u8 tag | body`, `len` covers tag+body, `MAX_FRAME`
 16 MiB. Primitives: fixed-width LE integers, f64 as bits, bool as 0/1 byte,

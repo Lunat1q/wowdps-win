@@ -14,12 +14,11 @@
     clippy::indexing_slicing
 )]
 
-use std::os::unix::fs::MetadataExt;
-use std::os::unix::net::UnixStream;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 use std::thread;
 use std::time::{Duration, Instant, SystemTime};
+use wowdps_proto::sock;
 
 use wowdps_core::tail::SourceSpec;
 use wowdps_daemon::history::{DirBackend, HistoryOptions, Retention, Store};
@@ -169,7 +168,7 @@ fn start(opts: DaemonOptions) -> Daemon {
         let _ = tx.send(run(opts));
     });
     let deadline = Instant::now() + DEADLINE;
-    while UnixStream::connect(&socket).is_err() {
+    while sock::connect(&socket).is_err() {
         assert!(Instant::now() < deadline, "daemon never bound {socket:?}");
         thread::sleep(Duration::from_millis(5));
     }
@@ -177,7 +176,7 @@ fn start(opts: DaemonOptions) -> Daemon {
 }
 
 fn stop(d: Daemon) {
-    if let Ok(stream) = UnixStream::connect(&d.socket)
+    if let Ok(stream) = sock::connect(&d.socket)
         && let Ok(mut c) = DaemonClient::over(stream, ClientKind::Mcp)
     {
         c.send(&ClientMsg::Shutdown);
@@ -194,7 +193,7 @@ fn settle(
     quiet: Duration,
     deadline: Duration,
 ) -> (HistoryStatus, Instant) {
-    let stream = UnixStream::connect(socket).unwrap();
+    let stream = sock::connect(socket).unwrap();
     let mut client = DaemonClient::over(stream, ClientKind::Mcp).unwrap();
     let until = Instant::now() + deadline;
     let mut since: Option<(Instant, u32)> = None;
@@ -301,9 +300,10 @@ fn checkpoint(cache: &Path, log: &Path) -> u64 {
         "{:016x}.bin",
         fnv64(log.to_string_lossy().as_bytes())
     ));
-    std::fs::metadata(&entry)
-        .unwrap_or_else(|e| panic!("{entry:?}: {e}"))
-        .ino()
+    wowdps_core::tail::file_id(
+        &std::fs::metadata(&entry).unwrap_or_else(|e| panic!("{entry:?}: {e}")),
+    )
+    .1
 }
 
 /// Move the second pull (20:10) to minute `to` of the hour, in place, the
@@ -328,7 +328,7 @@ fn cards(hist: &Path) -> Vec<FightCard> {
 }
 
 fn client(socket: &Path) -> DaemonClient {
-    DaemonClient::over(UnixStream::connect(socket).unwrap(), ClientKind::Mcp).unwrap()
+    DaemonClient::over(sock::connect(socket).unwrap(), ClientKind::Mcp).unwrap()
 }
 
 /// Send one history request and wait for its answer.

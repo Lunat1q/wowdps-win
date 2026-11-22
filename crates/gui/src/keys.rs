@@ -210,6 +210,7 @@ mod tests {
     /// it, fires its action through GPUI's own dispatch — Shift+K is
     /// Deaths, Ctrl+Shift+= zooms in like Ctrl+=.
     #[gpui_kit::test]
+    #[cfg_attr(windows, ignore = "Windows keyboards type Ctrl+Shift+= otherwise")]
     fn every_chord_fires_its_action_as_linux_types_it(cx: &mut TestAppContext) {
         let (window, recorder) = testkit::open(cx, size(px(200.), px(100.)), |window, cx| {
             let focus = cx.focus_handle();

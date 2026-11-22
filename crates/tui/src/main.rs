@@ -8,9 +8,9 @@ mod keys;
 mod ui;
 
 use std::io::{self, Write as _};
-use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
+use wowdps_proto::sock;
 
 use crossterm::event::{self, Event, KeyEventKind};
 use crossterm::terminal::{
@@ -95,9 +95,8 @@ fn main() {
 /// Git-style external dispatch: `wowdps foo ...` execs `wowdps-foo ...`,
 /// preferring a sibling of this binary (same build) over $PATH.
 fn run_external(name: &str, args: Vec<String>) -> i32 {
-    use std::os::unix::process::CommandExt as _;
     let bin = format!("wowdps-{name}");
-    let e = std::process::Command::new(find_bin(&bin)).args(args).exec();
+    let e = exec(std::process::Command::new(find_bin(&bin)).args(args));
     if e.kind() == io::ErrorKind::NotFound {
         eprintln!("wowdps: '{name}' is not a wowdps command (no {bin} found)\n\n{USAGE}");
     } else {
@@ -106,12 +105,31 @@ fn run_external(name: &str, args: Vec<String>) -> i32 {
     2
 }
 
+/// Replace this process with `cmd`; returns only on failure.
+#[cfg(unix)]
+fn exec(cmd: &mut std::process::Command) -> io::Error {
+    use std::os::unix::process::CommandExt as _;
+    cmd.exec()
+}
+
+/// Windows has no exec: run `cmd` with our stdio and leave with its code.
+#[cfg(windows)]
+fn exec(cmd: &mut std::process::Command) -> io::Error {
+    match cmd.status() {
+        // The workspace bans `exit` elsewhere; this is exec's stand-in.
+        #[allow(clippy::exit)]
+        Ok(status) => std::process::exit(status.code().unwrap_or(1)),
+        Err(e) => e,
+    }
+}
+
 /// A sibling of the running binary when one exists there, else the bare name
 /// for $PATH lookup.
 fn find_bin(name: &str) -> PathBuf {
+    let name = format!("{name}{}", std::env::consts::EXE_SUFFIX);
     std::env::current_exe()
         .ok()
-        .and_then(|p| p.parent().map(|d| d.join(name)))
+        .and_then(|p| p.parent().map(|d| d.join(&name)))
         .filter(|p| p.exists())
         .unwrap_or_else(|| PathBuf::from(name))
 }
@@ -200,7 +218,7 @@ fn daemon_log(msg: &str) {
     let base = std::env::var_os("XDG_STATE_HOME")
         .filter(|v| !v.is_empty())
         .map(PathBuf::from)
-        .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".local/state")));
+        .or_else(|| wowdps_proto::dirs::home().map(|h| PathBuf::from(h).join(".local/state")));
     let Some(dir) = base.map(|b| b.join("wowdps")) else {
         return;
     };
@@ -225,7 +243,7 @@ fn daemon_log(msg: &str) {
 /// `--stop`: exit 0 even if nothing was running — the goal state is "no
 /// daemon", and that is the state.
 fn do_stop() -> i32 {
-    match UnixStream::connect(wowdps_proto::socket_path()) {
+    match sock::connect(wowdps_proto::socket_path()) {
         Ok(mut stream) => {
             let _ = stream.write_all(&ClientMsg::Shutdown.encode());
             println!("wowdps: daemon asked to stop");
@@ -236,7 +254,7 @@ fn do_stop() -> i32 {
 }
 
 fn do_status() -> i32 {
-    let Ok(stream) = UnixStream::connect(wowdps_proto::socket_path()) else {
+    let Ok(stream) = sock::connect(wowdps_proto::socket_path()) else {
         println!("wowdps: no daemon running");
         return 1;
     };
@@ -592,7 +610,7 @@ fn launch_gui(source: Option<SourceSpec>) -> i32 {
 /// already running, spawning one otherwise.
 fn connect(source: Option<SourceArg>) -> Result<DaemonClient, String> {
     let sock = wowdps_proto::socket_path();
-    match UnixStream::connect(&sock) {
+    match sock::connect(&sock) {
         Ok(stream) => {
             let mut client = DaemonClient::over(stream, ClientKind::Tui)
                 .map_err(|e| format!("handshake with running daemon failed: {e}"))?;

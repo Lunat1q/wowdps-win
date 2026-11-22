@@ -42,7 +42,7 @@ impl Strip {
     /// as thick as the content across the edge, the edge's length along it.
     /// macOS's window is exactly its content, so everywhere else (and the
     /// tests) span a surface over the edge.
-    #[cfg(any(not(target_os = "macos"), test))]
+    #[cfg(any(not(any(target_os = "macos", windows)), test))]
     pub fn surface(&self, content: (f32, f32)) -> (f32, f32) {
         if self.edge.is_vertical() {
             (content.0, self.length())
@@ -79,7 +79,7 @@ impl Strip {
     /// the pointer's travel along the edge, clamped as `place` would.
     /// macOS's window is the content, so nothing slides there; everywhere
     /// else does (tests cover the math).
-    #[cfg(any(not(target_os = "macos"), test))]
+    #[cfg(any(not(any(target_os = "macos", windows)), test))]
     pub fn dragged(&self, content: (f32, f32), from: f32, travel: (f32, f32)) -> f32 {
         let delta = if self.edge.is_vertical() {
             travel.1

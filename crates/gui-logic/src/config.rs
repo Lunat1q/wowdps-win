@@ -293,7 +293,7 @@ impl Config {
             .map(PathBuf::from)
             .filter(|p| p.is_absolute())
             .unwrap_or_else(|| {
-                let home = std::env::var_os("HOME").unwrap_or_default();
+                let home = wowdps_proto::dirs::home().unwrap_or_default();
                 PathBuf::from(home).join(".config")
             });
         base.join("wowdps").join("config.toml")
@@ -872,6 +872,7 @@ mod tests {
     /// A save replaces the file whole — a reader sees the old file or the
     /// new one, never a truncated one — leaves no temporary behind, and
     /// writes through a symlinked config to its target.
+    #[cfg(unix)]
     #[test]
     fn a_save_is_atomic_and_keeps_a_symlink() {
         let dir = temp_path("atomic");

@@ -24,8 +24,6 @@
 //! [`Store::identity`]: crate::history::Store::identity
 
 use std::collections::{BTreeMap, HashSet};
-use std::os::unix::ffi::OsStrExt;
-use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 
 use wowdps_proto::history::{fight_id, fnv64};
@@ -66,10 +64,10 @@ impl Stat {
     pub fn of(path: &Path) -> Option<Self> {
         let m = std::fs::metadata(path).ok()?;
         m.is_file().then(|| Self {
-            ino: m.ino(),
+            ino: wowdps_core::tail::file_id(&m).1,
             len: m.len(),
-            mtime_s: m.mtime(),
-            mtime_ns: m.mtime_nsec(),
+            mtime_s: mtime(&m).0,
+            mtime_ns: mtime(&m).1,
         })
     }
 }
@@ -294,7 +292,7 @@ fn encode(rules: u64, store: u64, entries: &BTreeMap<PathBuf, Entry>) -> Vec<u8>
     wire::put_u64(&mut buf, store);
     let entries: Vec<(&PathBuf, &Entry)> = entries.iter().collect();
     wire::put_vec(&mut buf, &entries, |b, (path, e)| {
-        wire::put_bytes(b, path.as_os_str().as_bytes());
+        wire::put_bytes(b, &path_bytes(path));
         wire::put_u64(b, e.stat.ino);
         wire::put_u64(b, e.stat.len);
         wire::put_i64(b, e.stat.mtime_s);
@@ -319,7 +317,7 @@ fn decode(bytes: &[u8]) -> Option<Decoded> {
     let store = rd.u64().ok()?;
     let entries = rd
         .vec(|r| {
-            let path = PathBuf::from(std::ffi::OsStr::from_bytes(&r.bytes()?));
+            let path = path_of(r.bytes()?);
             let stat = Stat {
                 ino: r.u64()?,
                 len: r.u64()?,
@@ -342,6 +340,50 @@ fn decode(bytes: &[u8]) -> Option<Decoded> {
         store,
         entries,
     })
+}
+
+/// Modified time as (seconds, nanoseconds) since the epoch.
+fn mtime(m: &std::fs::Metadata) -> (i64, i64) {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        (m.mtime(), m.mtime_nsec())
+    }
+    #[cfg(not(unix))]
+    {
+        let d = m
+            .modified()
+            .ok()
+            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+            .unwrap_or_default();
+        (d.as_secs() as i64, i64::from(d.subsec_nanos()))
+    }
+}
+
+/// A path as the manifest stores it: its bytes on unix; UTF-8 elsewhere
+/// (a path that is not round-trips to another and its log is read again).
+fn path_bytes(path: &Path) -> Vec<u8> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::ffi::OsStrExt;
+        path.as_os_str().as_bytes().to_vec()
+    }
+    #[cfg(not(unix))]
+    {
+        path.to_string_lossy().into_owned().into_bytes()
+    }
+}
+
+fn path_of(bytes: Vec<u8>) -> PathBuf {
+    #[cfg(unix)]
+    {
+        use std::os::unix::ffi::OsStringExt;
+        PathBuf::from(std::ffi::OsString::from_vec(bytes))
+    }
+    #[cfg(not(unix))]
+    {
+        PathBuf::from(String::from_utf8_lossy(&bytes).into_owned())
+    }
 }
 
 #[cfg(test)]
@@ -437,7 +479,7 @@ mod tests {
         std::fs::write(&log, "a log\n").unwrap();
         set_mtime(&log, at);
         assert!(m.unchanged(&key, &cards(&both)).is_some(), "as it was");
-        set_mtime(&log, at + std::time::Duration::from_nanos(1));
+        set_mtime(&log, at + std::time::Duration::from_micros(1));
         assert!(m.unchanged(&key, &cards(&both)).is_none(), "touched");
         // Replaced by another file of the same name, length and mtime.
         let other = tmp.0.join("other.txt");

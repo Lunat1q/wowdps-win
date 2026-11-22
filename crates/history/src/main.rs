@@ -348,7 +348,10 @@ fn run(args: Vec<String>) -> Result<String, String> {
 fn import(path: &std::path::Path) -> Result<String, String> {
     let bin = std::env::current_exe()
         .ok()
-        .and_then(|p| p.parent().map(|d| d.join("wowdps")))
+        .and_then(|p| {
+            p.parent()
+                .map(|d| d.join(format!("wowdps{}", std::env::consts::EXE_SUFFIX)))
+        })
         .filter(|p| p.exists())
         .unwrap_or_else(|| PathBuf::from("wowdps"));
     let mut client = DaemonClient::connect(&bin, None, ClientKind::Mcp)
@@ -450,7 +453,10 @@ fn regrade(
     }
     let bin = std::env::current_exe()
         .ok()
-        .and_then(|p| p.parent().map(|d| d.join("wowdps")))
+        .and_then(|p| {
+            p.parent()
+                .map(|d| d.join(format!("wowdps{}", std::env::consts::EXE_SUFFIX)))
+        })
         .filter(|p| p.exists())
         .unwrap_or_else(|| PathBuf::from("wowdps"));
     let mut client = DaemonClient::connect(&bin, None, ClientKind::Mcp)
@@ -544,7 +550,7 @@ fn configured_history_dir() -> Option<PathBuf> {
     let base = std::env::var_os("XDG_CONFIG_HOME")
         .filter(|v| !v.is_empty())
         .map(PathBuf::from)
-        .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config")))?;
+        .or_else(|| wowdps_proto::dirs::home().map(|h| PathBuf::from(h).join(".config")))?;
     let text = std::fs::read_to_string(base.join("wowdps/config.toml")).ok()?;
     let mut found = None;
     for line in text.lines() {

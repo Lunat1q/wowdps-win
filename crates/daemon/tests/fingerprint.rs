@@ -210,6 +210,7 @@ fn an_out_of_line_test_module_is_left_out_with_its_children() {
     assert_eq!(print(&t.0, &[Unit::Tree("src")]), before);
 }
 
+#[cfg(unix)]
 #[test]
 fn stray_entries_move_nothing() {
     let t = Temp::new("stray");

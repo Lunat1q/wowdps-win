@@ -120,7 +120,7 @@ impl Bridge {
     }
 
     /// Over an existing stream (tests).
-    pub fn over(stream: std::os::unix::net::UnixStream) -> std::io::Result<Bridge> {
+    pub fn over(stream: wowdps_proto::sock::Stream) -> std::io::Result<Bridge> {
         let client = DaemonClient::over(stream, ClientKind::Mcp)?;
         Ok(Bridge {
             client: Some(client),
@@ -144,7 +144,10 @@ impl Bridge {
         if self.client.is_none() {
             let bin = std::env::current_exe()
                 .ok()
-                .and_then(|p| p.parent().map(|d| d.join("wowdps")))
+                .and_then(|p| {
+                    p.parent()
+                        .map(|d| d.join(format!("wowdps{}", std::env::consts::EXE_SUFFIX)))
+                })
                 .filter(|p| p.exists())
                 .unwrap_or_else(|| PathBuf::from("wowdps"));
             let client = DaemonClient::connect(&bin, None, ClientKind::Mcp)

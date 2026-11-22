@@ -26,7 +26,10 @@
 //! Hyprland, socket gone, unparsable reply, no game window — resolves to
 //! "visible": tracking trouble must never hide the meter mid-pull.
 
+#[cfg(not(unix))]
+use nosock::UnixStream;
 use std::io::{BufRead, BufReader, Read, Write};
+#[cfg(unix)]
 use std::os::unix::net::UnixStream;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{self, Receiver, Sender};
@@ -598,7 +601,45 @@ fn workspace_monitor(workspaces: &str, ws: i32) -> Option<String> {
 /// Test code compiled into the library under `test-support` (the GUI's
 /// tests drive it), where clippy.toml's test exemptions do not reach: a
 /// panic is still the failure mechanism here, so the same two are allowed.
-#[cfg(any(test, feature = "test-support"))]
+/// Hyprland is unix's alone: off it every connection fails, so every query
+/// answers `None` and the tracker reports nothing (the overlay stays shown).
+#[cfg(not(unix))]
+mod nosock {
+    use std::io;
+    use std::path::Path;
+    use std::time::Duration;
+
+    pub enum UnixStream {}
+
+    impl UnixStream {
+        pub fn connect(_: impl AsRef<Path>) -> io::Result<Self> {
+            Err(io::ErrorKind::Unsupported.into())
+        }
+        pub fn set_read_timeout(&self, _: Option<Duration>) -> io::Result<()> {
+            match *self {}
+        }
+        pub fn set_write_timeout(&self, _: Option<Duration>) -> io::Result<()> {
+            match *self {}
+        }
+    }
+
+    impl io::Read for UnixStream {
+        fn read(&mut self, _: &mut [u8]) -> io::Result<usize> {
+            match *self {}
+        }
+    }
+
+    impl io::Write for UnixStream {
+        fn write(&mut self, _: &[u8]) -> io::Result<usize> {
+            match *self {}
+        }
+        fn flush(&mut self) -> io::Result<()> {
+            match *self {}
+        }
+    }
+}
+
+#[cfg(all(unix, any(test, feature = "test-support")))]
 #[allow(clippy::unwrap_used, clippy::indexing_slicing)]
 pub mod fake {
     use std::io::{Read, Write};
@@ -888,7 +929,7 @@ workspace 9 (9) on monitor DP-2:
     }
 }
 
-#[cfg(test)]
+#[cfg(all(unix, test))]
 mod tests {
     use super::*;
     use fake::{

@@ -24,13 +24,13 @@ pub mod sources;
 pub mod swept;
 
 use std::io::{self, Seek, SeekFrom};
-use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
+use wowdps_proto::sock;
 
 use wowdps_core::index;
 use wowdps_core::tail::{POLL_INTERVAL, ScanFn, SourceSpec, TailEvent, Tailer};
@@ -230,7 +230,7 @@ pub fn run(opts: DaemonOptions) -> io::Result<()> {
 
     // Ours now: a leftover socket is stale by definition.
     let _ = std::fs::remove_file(&opts.socket);
-    let listener = UnixListener::bind(&opts.socket)?;
+    let listener = sock::bind(&opts.socket)?;
 
     let (hub_tx, hub_rx) = mpsc::channel::<HubMsg>();
 
@@ -293,7 +293,7 @@ pub fn run(opts: DaemonOptions) -> io::Result<()> {
     // Wind down: wake the accept loop so it observes `stop`, then remove the
     // socket. The lock releases when `lock` drops.
     stop.store(true, Ordering::SeqCst);
-    let _ = UnixStream::connect(&opts.socket);
+    let _ = sock::connect(&opts.socket);
     let _ = std::fs::remove_file(&opts.socket);
     drop(lock);
     Ok(())
@@ -303,7 +303,15 @@ pub fn run(opts: DaemonOptions) -> io::Result<()> {
 /// same string from its `--file`/`--logs` flags; inequality is the
 /// "daemon is following something else" hard error.
 pub fn spec_display(spec: &SourceSpec) -> String {
-    let canon = |p: &std::path::Path| std::fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf());
+    let canon = |p: &std::path::Path| {
+        let c = std::fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf());
+        // Windows canonicalizes to a verbatim `\\?\C:\...`; show the plain
+        // drive path (a verbatim UNC path keeps its prefix).
+        match c.to_str().and_then(|s| s.strip_prefix(r"\\?\")) {
+            Some(rest) if cfg!(windows) && !rest.starts_with("UNC") => PathBuf::from(rest),
+            _ => c,
+        }
+    };
     match spec {
         SourceSpec::File(p) => format!("file:{}", canon(p).display()),
         SourceSpec::Dir(d) => format!("logs:{}", canon(d).display()),

@@ -15,11 +15,11 @@
 #[path = "../../core/tests/real_log/mod.rs"]
 mod real_log;
 
-use std::os::unix::net::UnixStream;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 use std::thread;
 use std::time::{Duration, Instant};
+use wowdps_proto::sock;
 
 use wowdps_core::tail::{SourceSpec, TailEvent};
 use wowdps_daemon::engine::{Engine, EngineEvent};
@@ -1935,7 +1935,7 @@ fn start(opts: DaemonOptions) -> Daemon {
     loop {
         // The socket's vnode appears at bind(); listen() follows. A connect
         // in that gap is refused, so readiness is a connect, not exists().
-        if UnixStream::connect(&socket).is_ok() {
+        if sock::connect(&socket).is_ok() {
             break;
         }
         assert!(Instant::now() < deadline, "daemon never bound {socket:?}");
@@ -1945,7 +1945,7 @@ fn start(opts: DaemonOptions) -> Daemon {
 }
 
 fn stop(d: Daemon) {
-    if let Ok(stream) = UnixStream::connect(&d.socket)
+    if let Ok(stream) = sock::connect(&d.socket)
         && let Ok(mut c) = DaemonClient::over(stream, ClientKind::Mcp)
     {
         c.send(&ClientMsg::Shutdown);
@@ -1956,7 +1956,7 @@ fn stop(d: Daemon) {
 /// Poll `Status` until the store reports `fights` cards and nothing
 /// importing, or the deadline passes.
 fn wait_for_fights(socket: &Path, fights: u32) -> wowdps_proto::HistoryStatus {
-    let stream = UnixStream::connect(socket).unwrap();
+    let stream = sock::connect(socket).unwrap();
     let mut client = DaemonClient::over(stream, ClientKind::Mcp).unwrap();
     let deadline = Instant::now() + DEADLINE;
     let mut last = None;
@@ -2004,7 +2004,7 @@ fn a_pull_closed_live_is_cut_into_the_replay_tier() {
     let d = start(options(&tmp, SourceSpec::Dir(logs), hist.clone()));
     wait_for_fights(&d.socket, 2);
     // A session listening for the store's broadcasts.
-    let stream = UnixStream::connect(&d.socket).unwrap();
+    let stream = sock::connect(&d.socket).unwrap();
     let mut client = DaemonClient::over(stream, ClientKind::Mcp).unwrap();
     // A third pull, written as the game writes it, after the daemon caught up.
     let pull = concat!(
@@ -2379,7 +2379,7 @@ fn an_import_over_the_socket_lands_in_the_store() {
     std::fs::create_dir_all(&logs).unwrap();
     let hist = tmp.join("history");
     let d = start(options(&tmp, SourceSpec::Dir(logs), hist.clone()));
-    let stream = UnixStream::connect(&d.socket).unwrap();
+    let stream = sock::connect(&d.socket).unwrap();
     let mut client = DaemonClient::over(stream, ClientKind::Mcp).unwrap();
     // Every message until `done` says it has what it needs.
     let until = |client: &mut DaemonClient, done: &mut dyn FnMut(&DaemonMsg) -> bool| {
@@ -2568,7 +2568,7 @@ fn real_log_import_reports_fights_wall_time_and_bytes() {
         SourceSpec::File(PathBuf::from(&real)),
         hist.clone(),
     ));
-    let stream = UnixStream::connect(&d.socket).unwrap();
+    let stream = sock::connect(&d.socket).unwrap();
     let mut client = DaemonClient::over(stream, ClientKind::Mcp).unwrap();
     let deadline = Instant::now() + Duration::from_secs(600);
     let mut settled: Option<wowdps_proto::HistoryStatus> = None;
@@ -3148,7 +3148,7 @@ fn importing_an_older_file_by_hand_stores_its_open_key() {
     // The daemon tails the fixture alone; the older file is not its source.
     let d = start(options(&tmp, SourceSpec::File(new), hist.clone()));
     wait_for_fights(&d.socket, 2);
-    let stream = UnixStream::connect(&d.socket).unwrap();
+    let stream = sock::connect(&d.socket).unwrap();
     let mut client = DaemonClient::over(stream, ClientKind::Mcp).unwrap();
     client.send(&ClientMsg::ImportLog {
         req_id: 7,
@@ -3337,7 +3337,7 @@ fn a_regrade_rewrites_a_card_in_place_and_keeps_its_pin() {
     let d = start(options(&tmp, SourceSpec::Dir(logs), hist.clone()));
     wait_for_fights(&d.socket, 2);
 
-    let stream = UnixStream::connect(&d.socket).unwrap();
+    let stream = sock::connect(&d.socket).unwrap();
     let mut client = DaemonClient::over(stream, ClientKind::Mcp).unwrap();
     // Find the kill, pin it, then tamper with its stored grade so the
     // rewrite is observable.
@@ -3455,7 +3455,7 @@ fn a_regrade_brings_a_keys_affixes_back_from_its_log() {
     // The rows tier is rewritten with the card: its return is the regrade.
     std::fs::remove_file(hist.join("rows").join(format!("{}.json", key.id))).unwrap();
 
-    let stream = UnixStream::connect(&d.socket).unwrap();
+    let stream = sock::connect(&d.socket).unwrap();
     let mut client = DaemonClient::over(stream, ClientKind::Mcp).unwrap();
     client.send(&ClientMsg::Regrade {
         req_id: 1,
@@ -3524,7 +3524,7 @@ fn a_regrade_by_kind_rewrites_every_card_across_logs() {
     .cards()
     .to_vec();
 
-    let stream = UnixStream::connect(&d.socket).unwrap();
+    let stream = sock::connect(&d.socket).unwrap();
     let mut client = DaemonClient::over(stream, ClientKind::Mcp).unwrap();
     for (req_id, kind) in [(1, FightKind::Encounter), (2, FightKind::Overall)] {
         let picked: Vec<&FightCard> = cards.iter().filter(|c| c.kind == kind).collect();
@@ -3644,7 +3644,7 @@ fn a_daemon_following_two_editions_stores_and_regrades_from_both_folders() {
         .unwrap();
     std::fs::remove_file(hist.join("rows").join(format!("{}.json", geilhast.id))).unwrap();
 
-    let stream = UnixStream::connect(&d.socket).unwrap();
+    let stream = sock::connect(&d.socket).unwrap();
     let mut client = DaemonClient::over(stream, ClientKind::Mcp).unwrap();
     client.send(&ClientMsg::Regrade {
         req_id: 1,
@@ -3784,7 +3784,7 @@ fn a_regrade_by_edition_gives_a_forever_replay_its_posts() {
 
     let d = start(opts());
     wait_for_fights(&d.socket, 3);
-    let stream = UnixStream::connect(&d.socket).unwrap();
+    let stream = sock::connect(&d.socket).unwrap();
     let mut client = DaemonClient::over(stream, ClientKind::Mcp).unwrap();
     client.send(&ClientMsg::Regrade {
         req_id: 1,
@@ -3859,7 +3859,7 @@ fn a_keys_member_boss_drills_from_the_log_on_demand() {
     let st = wait_for_fights(&d.socket, 6);
     assert_eq!(st.error, None);
 
-    let stream = UnixStream::connect(&d.socket).unwrap();
+    let stream = sock::connect(&d.socket).unwrap();
     let mut client = DaemonClient::over(stream, ClientKind::Mcp).unwrap();
     client.send(&ClientMsg::GetHistory {
         req_id: 1,
@@ -4895,7 +4895,7 @@ fn saved_variables_error(tag: &str, data: &[u8]) -> (String, PathBuf) {
     );
     opts.history.as_mut().unwrap().addon_dir = Some(product);
     let d = start(opts);
-    let stream = UnixStream::connect(&d.socket).unwrap();
+    let stream = sock::connect(&d.socket).unwrap();
     let mut client = DaemonClient::over(stream, ClientKind::Mcp).unwrap();
     let deadline = Instant::now() + DEADLINE;
     let error = loop {
@@ -4930,7 +4930,8 @@ fn saved_variables_parse_errors_publish_account_number_and_file_context() {
         .parent()
         .unwrap()
         .with_file_name("account 2")
-        .join("SavedVariables/wowdps.lua");
+        .join("SavedVariables")
+        .join("wowdps.lua");
     let why = wowdps_proto::history::addon_table("WOWDPS_DATA = {").unwrap_err();
     assert_eq!(error, format!("{}: {why}", display.display()));
     assert!(!error.contains("ZED") && !error.contains("TEST"), "{error}");
@@ -4951,7 +4952,8 @@ fn saved_variables_read_errors_publish_account_number_and_os_error() {
         .parent()
         .unwrap()
         .with_file_name("account 2")
-        .join("SavedVariables/wowdps.lua");
+        .join("SavedVariables")
+        .join("wowdps.lua");
     let why = String::from_utf8(vec![0xff]).unwrap_err();
     assert!(
         error.starts_with(&format!("{}: ", display.display())),
@@ -5017,7 +5019,7 @@ fn a_daemon_updates_a_stale_addon_and_files_the_saved_variables_it_finds() {
         found,
         ["Player-1168-0A1B2C01.json", "Player-1168-0A1B2C02.json"]
     );
-    let stream = UnixStream::connect(&d.socket).unwrap();
+    let stream = sock::connect(&d.socket).unwrap();
     let mut client = DaemonClient::over(stream, ClientKind::Mcp).unwrap();
     client.send(&ClientMsg::GetHistory {
         req_id: 9,
@@ -5470,7 +5472,7 @@ fn pinning_a_wipe_backfills_its_series_from_the_log() {
     let d = start(opts);
     // The two pulls; the raid's Σ stays open on the tailed log.
     wait_for_fights(&d.socket, 2);
-    let stream = UnixStream::connect(&d.socket).unwrap();
+    let stream = sock::connect(&d.socket).unwrap();
     let mut client = DaemonClient::over(stream, ClientKind::Mcp).unwrap();
     let ask = |client: &mut DaemonClient, msg: ClientMsg, want: u32| {
         client.send(&msg);

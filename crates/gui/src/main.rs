@@ -11,6 +11,10 @@
 //! overlay supervisor spawns this binary (config `gui_binary`, default
 //! `wowdps-gui`) with `--overlay` when the game starts.
 
+// Windows: a GUI app, so a double-click opens no console window beside it.
+// Its stderr still reaches a pipe (the daemon's capture of the overlay's).
+#![cfg_attr(windows, windows_subsystem = "windows")]
+
 mod ease;
 #[cfg(test)]
 mod guard;

@@ -29,6 +29,7 @@ pub mod msg;
 pub mod placed;
 pub mod replay;
 pub mod series;
+pub mod sock;
 pub mod state;
 pub mod talents;
 mod varint;

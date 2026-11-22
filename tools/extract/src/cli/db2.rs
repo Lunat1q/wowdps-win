@@ -457,9 +457,17 @@ pub fn sql(mut a: Args) -> Result<(), String> {
         );
     }
     // The shell is the user's now (exec: no child to wait on).
-    use std::os::unix::process::CommandExt;
-    Err(format!(
-        "duckdb: {} (a duckdb CLI must be on PATH)",
+    #[cfg(unix)]
+    let e = {
+        use std::os::unix::process::CommandExt;
         cmd.exec()
-    ))
+    };
+    // No exec on Windows: run it on our console and leave with its code.
+    #[cfg(windows)]
+    let e = match cmd.status() {
+        #[allow(clippy::exit)]
+        Ok(status) => std::process::exit(status.code().unwrap_or(1)),
+        Err(e) => e,
+    };
+    Err(format!("duckdb: {e} (a duckdb CLI must be on PATH)"))
 }

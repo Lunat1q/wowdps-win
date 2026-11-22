@@ -9,6 +9,8 @@
 // helper fns below sit outside #[test] items, which the allow-*-in-tests
 // exemptions no longer cover, so this integration-test crate says it
 // explicitly.
+// The sandbox runs shell scripts as the external commands and the GUI.
+#![cfg(unix)]
 #![allow(
     clippy::expect_used,
     clippy::unwrap_used,
@@ -18,10 +20,10 @@
 
 use std::io::Write;
 use std::os::unix::fs::PermissionsExt;
-use std::os::unix::net::UnixListener;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 use std::time::{Duration, Instant};
+use wowdps_proto::sock;
 
 use wowdps_proto::{ClientMsg, DaemonMsg, PROTO_VERSION, wire};
 
@@ -369,7 +371,7 @@ fn an_unrunnable_external_binary_reports_the_exec_error() {
 fn status_reports_a_failed_handshake() {
     let sb = Sandbox::new("badhandshake");
     std::fs::create_dir_all(sb.socket().parent().unwrap()).unwrap();
-    let listener = UnixListener::bind(sb.socket()).unwrap();
+    let listener = sock::bind(sb.socket()).unwrap();
     let server = std::thread::spawn(move || {
         if let Ok((stream, _)) = listener.accept() {
             drop(stream);
@@ -391,7 +393,7 @@ fn status_reports_a_failed_handshake() {
 fn status_reports_a_daemon_that_never_answers() {
     let sb = Sandbox::new("noanswer");
     std::fs::create_dir_all(sb.socket().parent().unwrap()).unwrap();
-    let listener = UnixListener::bind(sb.socket()).unwrap();
+    let listener = sock::bind(sb.socket()).unwrap();
     let server = std::thread::spawn(move || {
         if let Ok((mut stream, _)) = listener.accept() {
             // Read the Hello before answering, and the GetStatus before
@@ -704,7 +706,7 @@ fn self_spawned_daemon_is_waited_for_when_a_test_panics() {
 }
 
 fn shutdown(socket: &Path) {
-    if let Ok(mut stream) = std::os::unix::net::UnixStream::connect(socket) {
+    if let Ok(mut stream) = sock::connect(socket) {
         let _ = stream.set_write_timeout(Some(Duration::from_secs(1)));
         let _ = stream.write_all(&ClientMsg::Shutdown.encode());
     }

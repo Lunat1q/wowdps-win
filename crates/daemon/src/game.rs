@@ -17,7 +17,7 @@ use std::sync::mpsc::Sender;
 use std::thread;
 use std::time::Duration;
 
-#[cfg(any(not(target_os = "macos"), test))]
+#[cfg(any(all(unix, not(target_os = "macos")), test))]
 use std::path::Path;
 
 use wowdps_core::cli::PRODUCTS;
@@ -89,7 +89,7 @@ impl Running {
     }
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(all(unix, not(target_os = "macos")))]
 pub fn game_running(pattern: &str) -> Running {
     scan_proc(Path::new("/proc"), pattern)
 }
@@ -115,6 +115,48 @@ pub fn game_running(pattern: &str) -> Running {
     scan_ps(&String::from_utf8_lossy(&out.stdout), pattern)
 }
 
+/// Windows: `tasklist` names every process's image (`Wow.exe`), not its
+/// path, so a match is a game the watcher cannot name by edition
+/// ([`Running::unnamed`]): the overlay is shown, the live edition is the
+/// newest log's.
+// ponytail: the image path (and with it the edition) needs
+// QueryFullProcessImageNameW over FFI; add it if editions run side by side.
+#[cfg(windows)]
+pub fn game_running(pattern: &str) -> Running {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    if pattern.is_empty() {
+        return Running::default();
+    }
+    let Ok(out) = std::process::Command::new("tasklist")
+        .args(["/fo", "csv", "/nh"])
+        .stderr(std::process::Stdio::null())
+        .creation_flags(CREATE_NO_WINDOW)
+        .output()
+    else {
+        return Running::default();
+    };
+    if !out.status.success() {
+        return Running::default();
+    }
+    scan_tasklist(&String::from_utf8_lossy(&out.stdout), pattern)
+}
+
+/// Testable core of Windows' sweep: `tasklist /fo csv /nh`'s rows, the
+/// first quoted field each process's image name.
+#[cfg(any(windows, test))]
+pub fn scan_tasklist(out: &str, pattern: &str) -> Running {
+    let mut running = Running::default();
+    for row in out.lines() {
+        let image = row.trim_start().trim_start_matches('"');
+        let image = image.split('"').next().unwrap_or_default().as_bytes();
+        if matches(pattern, image, b"") {
+            running.note(image);
+        }
+    }
+    running
+}
+
 /// Testable core of macOS's sweep: `ps -o comm=`'s output, one program a
 /// line, the pattern matched against each whole.
 #[cfg(any(target_os = "macos", test))]
@@ -131,7 +173,7 @@ pub fn scan_ps(out: &str, pattern: &str) -> Running {
 
 /// Testable core: sweep `root` as if it were /proc, every process: two
 /// editions' clients may run at once.
-#[cfg(any(not(target_os = "macos"), test))]
+#[cfg(any(all(unix, not(target_os = "macos")), test))]
 pub fn scan_proc(root: &std::path::Path, pattern: &str) -> Running {
     let mut running = Running::default();
     let Ok(entries) = std::fs::read_dir(root) else {
@@ -157,7 +199,7 @@ pub fn scan_proc(root: &std::path::Path, pattern: &str) -> Running {
 /// The program a NUL-separated command line runs: its argv[0], whole (wine
 /// writes the client's Windows path there, spaces and all), never the
 /// arguments after it.
-#[cfg(any(not(target_os = "macos"), test))]
+#[cfg(any(all(unix, not(target_os = "macos")), test))]
 fn program(cmdline: &[u8]) -> &[u8] {
     cmdline.split(|&b| b == 0).next().unwrap_or_default()
 }
@@ -199,6 +241,18 @@ pub fn spawn_watcher(pattern: String, hub: Sender<HubMsg>, poll: Duration) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn tasklist_rows_match_by_image_name() {
+        let out = concat!(
+            "\"System\",\"4\",\"Services\",\"0\",\"144 K\"\r\n",
+            "\"Wow.exe\",\"9120\",\"Console\",\"1\",\"2,104,332 K\"\r\n",
+            "\"notepad.exe\",\"77\",\"Console\",\"1\",\"9 K\"\r\n",
+        );
+        assert_eq!(scan_tasklist(out, "wow.exe"), Running::unnamed());
+        assert_eq!(scan_tasklist(out, "nope.exe"), Running::default());
+        assert_eq!(scan_tasklist("", "wow.exe"), Running::default());
+    }
 
     #[test]
     fn matching_is_case_insensitive_and_covers_wine_paths() {

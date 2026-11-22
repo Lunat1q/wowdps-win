@@ -288,6 +288,10 @@ mod tests {
         target_os = "macos",
         ignore = "gpui's mac platform must be created on the main thread"
     )]
+    #[cfg_attr(
+        windows,
+        ignore = "GPUI's headless Windows text system lists no in-memory font, so text falls back"
+    )]
     fn every_theme_s_faces_are_bundled_and_tabular() {
         use gpui_kit::{FontWeight, font, px};
         use wowdps_gui_logic::theme::themes;

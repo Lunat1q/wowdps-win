@@ -11,10 +11,10 @@
     clippy::indexing_slicing
 )]
 
-use std::os::unix::net::UnixStream;
 use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::{Duration, Instant};
+use wowdps_proto::sock;
 
 use wowdps_core::tail::SourceSpec;
 use wowdps_daemon::config::Config;
@@ -243,7 +243,7 @@ struct Stop(PathBuf);
 
 impl Drop for Stop {
     fn drop(&mut self) {
-        if let Ok(mut s) = UnixStream::connect(&self.0) {
+        if let Ok(mut s) = sock::connect(&self.0) {
             let _ = std::io::Write::write_all(&mut s, &ClientMsg::Shutdown.encode());
         }
     }
@@ -268,7 +268,7 @@ fn start(
     let deadline = Instant::now() + DEADLINE;
     // The socket's path names the user (its fallback folder carries the
     // uid): never print it.
-    while UnixStream::connect(&socket).is_err() {
+    while sock::connect(&socket).is_err() {
         assert!(
             Instant::now() < deadline,
             "the daemon never bound its socket"
@@ -379,7 +379,7 @@ fn a_default_daemon_follows_both_editions_of_an_install() {
     let _ = std::fs::remove_dir_all(&dir);
     let (daemon, socket, _stop) = start(opts, &dir);
 
-    let stream = UnixStream::connect(&socket).expect("connect");
+    let stream = sock::connect(&socket).expect("connect");
     let mut client = DaemonClient::over(stream, ClientKind::Mcp).expect("handshake");
     let status = status_until(&mut client, "both sources listed", |m| {
         sources_of(m).len() == 2 && sources_of(m).iter().all(|(e, _)| e.is_some())
@@ -467,7 +467,7 @@ fn forevers_folder_is_followed_from_its_first_log() {
     let dir = root.join("later");
     let _ = std::fs::remove_dir_all(&dir);
     let (daemon, socket, _stop) = start(opts, &dir);
-    let stream = UnixStream::connect(&socket).expect("connect");
+    let stream = sock::connect(&socket).expect("connect");
     let mut client = DaemonClient::over(stream, ClientKind::Mcp).expect("handshake");
     let retail_only = [(
         Some(Edition::Retail),
@@ -536,14 +536,14 @@ fn a_production_daemon_runs_with_the_cache_and_watcher_wired() {
     loop {
         // The socket's vnode appears at bind(); listen() follows. A connect
         // in that gap is refused, so readiness is a connect, not exists().
-        if UnixStream::connect(&socket).is_ok() {
+        if sock::connect(&socket).is_ok() {
             break;
         }
         assert!(Instant::now() < deadline, "daemon never bound {socket:?}");
         thread::sleep(Duration::from_millis(5));
     }
 
-    let stream = UnixStream::connect(&socket).expect("connect");
+    let stream = sock::connect(&socket).expect("connect");
     let mut client = DaemonClient::over(stream, ClientKind::Mcp).expect("handshake");
     client.send(&ClientMsg::GetStatus { req_id: 7 });
     let status = loop {
@@ -604,7 +604,7 @@ fn stored_by(
 ) -> wowdps_daemon::history::Store<wowdps_daemon::history::DirBackend> {
     let _ = std::fs::remove_dir_all(dir);
     let (daemon, socket, _stop) = start(opts, dir);
-    let stream = UnixStream::connect(&socket).expect("connect");
+    let stream = sock::connect(&socket).expect("connect");
     let mut client = DaemonClient::over(stream, ClientKind::Mcp).expect("handshake");
     status_until(
         &mut client,

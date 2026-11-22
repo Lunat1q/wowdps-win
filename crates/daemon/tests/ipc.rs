@@ -6,11 +6,11 @@
 mod real_log;
 
 use std::io::Write as _;
-use std::os::unix::net::UnixStream;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 use std::thread;
 use std::time::{Duration, Instant};
+use wowdps_proto::sock::{self, Stream};
 
 use wowdps_core::meter::meter_from_lines;
 use wowdps_core::model::{SegmentId, SegmentKind, View};
@@ -83,7 +83,7 @@ fn start(opts: DaemonOptions) -> Daemon {
     loop {
         // The socket's vnode appears at bind(); listen() follows. A connect
         // in that gap is refused, so readiness is a connect, not exists().
-        if UnixStream::connect(&socket).is_ok() {
+        if sock::connect(&socket).is_ok() {
             break;
         }
         assert!(Instant::now() < deadline, "daemon never bound {socket:?}");
@@ -93,14 +93,14 @@ fn start(opts: DaemonOptions) -> Daemon {
 }
 
 struct Client {
-    stream: UnixStream,
+    stream: Stream,
 }
 
 impl Client {
     fn connect(socket: &Path) -> Self {
         let deadline = Instant::now() + DEADLINE;
         let stream = loop {
-            match UnixStream::connect(socket) {
+            match sock::connect(socket) {
                 Ok(s) => break s,
                 Err(e) => {
                     assert!(Instant::now() < deadline, "connect {socket:?}: {e}");
@@ -705,7 +705,7 @@ fn a_stale_socket_file_is_recovered_not_fatal() {
     let tmp = Temp::new("stale");
     let opts = options(&tmp, SourceSpec::File(PathBuf::from(FIXTURE)));
     // A dead daemon's leftover: bound once, never cleaned up.
-    drop(std::os::unix::net::UnixListener::bind(&opts.socket).unwrap());
+    drop(sock::bind(&opts.socket).unwrap());
     assert!(opts.socket.exists());
 
     let d = start(opts);

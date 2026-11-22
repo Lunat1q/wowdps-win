@@ -122,7 +122,9 @@ impl HistoryOptions {
         let base = std::env::var_os("XDG_DATA_HOME")
             .filter(|v| !v.is_empty())
             .map(PathBuf::from)
-            .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".local/share")))?;
+            .or_else(|| {
+                wowdps_proto::dirs::home().map(|h| PathBuf::from(h).join(".local/share"))
+            })?;
         Some(base.join("wowdps/history/v1"))
     }
 }
@@ -6066,7 +6068,8 @@ mod tests {
                 .product
                 .join("WTF/Account")
                 .join(label)
-                .join("SavedVariables/wowdps.lua");
+                .join("SavedVariables")
+                .join("wowdps.lua");
             assert!(
                 error.starts_with(&format!("{}: ", display.display())),
                 "{error}"

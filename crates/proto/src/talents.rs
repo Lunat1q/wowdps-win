@@ -1275,6 +1275,7 @@ mod tests {
     /// then `$HOME/.local/share`, `$WOWDPS_TALENTS` overriding both; a
     /// missing file names the generator, a corrupt one names the file, and
     /// a good one is parsed exactly once.
+    #[cfg(unix)]
     #[test]
     fn the_dataset_is_found_through_the_environment_and_loaded_once() {
         use std::path::PathBuf;

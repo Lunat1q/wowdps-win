@@ -3,11 +3,11 @@
 //! hub; the writer drains a bounded outbox. Neither ever touches the engine.
 
 use std::io::Write;
-use std::os::unix::net::{UnixListener, UnixStream};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{Sender, sync_channel};
 use std::thread;
+use wowdps_proto::sock::{Listener, Stream};
 
 use wowdps_proto::wire;
 use wowdps_proto::{ClientMsg, DaemonMsg, PROTO_VERSION};
@@ -17,7 +17,7 @@ use crate::session::OUTBOX;
 
 /// Accept until `stop` is set (wake a blocked accept by connecting once).
 pub fn spawn_accept(
-    listener: UnixListener,
+    listener: Listener,
     hub: Sender<HubMsg>,
     stop: Arc<AtomicBool>,
 ) -> thread::JoinHandle<()> {
@@ -35,7 +35,7 @@ pub fn spawn_accept(
     })
 }
 
-fn connection(id: u64, stream: UnixStream, hub: Sender<HubMsg>) {
+fn connection(id: u64, stream: Stream, hub: Sender<HubMsg>) {
     let mut reader = match stream.try_clone() {
         Ok(s) => s,
         Err(_) => return,
@@ -101,7 +101,7 @@ fn connection(id: u64, stream: UnixStream, hub: Sender<HubMsg>) {
 
 /// One decoded frame, or `None` on EOF/garbage (either way the connection is
 /// done for).
-fn read_client_msg(stream: &mut UnixStream) -> Option<ClientMsg> {
+fn read_client_msg(stream: &mut Stream) -> Option<ClientMsg> {
     let (tag, body) = wire::read_frame(stream).ok()?;
     ClientMsg::decode(tag, &body).ok()
 }

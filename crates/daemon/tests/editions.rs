@@ -1696,7 +1696,8 @@ fn a_source_shows_its_newest_line_time_through_a_real_tailer() {
     );
 
     let second = dir.join("WoWCombatLog-110126_210000.txt");
-    std::fs::copy(FOREVER_LOG, &second).unwrap();
+    // Written, not copied: a Windows copy keeps the source's old mtime.
+    std::fs::write(&second, std::fs::read(FOREVER_LOG).unwrap()).unwrap();
     assert_eq!(
         settle(&mut tailer, &mut engine),
         buff,

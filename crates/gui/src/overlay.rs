@@ -120,7 +120,7 @@ fn output_follows_game(cfg: &Config) -> bool {
 /// before it picks an output.
 const GAME_WINDOW_WAIT: std::time::Duration = std::time::Duration::from_secs(30);
 
-#[cfg(any(target_os = "linux", target_os = "macos"))]
+#[cfg(any(target_os = "linux", target_os = "macos", windows))]
 fn surface(
     cx: &mut App,
     output: Option<&str>,
@@ -311,7 +311,9 @@ fn open_on(
 /// panel), placed at the offset along the edge, flush across it. A size
 /// change cannot move the origin here, so `place` asks for a re-anchor
 /// (the surface module reopens, and the new corner is computed right).
-#[cfg(target_os = "macos")]
+/// Windows takes the same panel: GPUI opens a `PopUp` there as a topmost
+/// tool window, which floats over a borderless-windowed game.
+#[cfg(any(target_os = "macos", windows))]
 fn open_on(
     cx: &mut App,
     _output: Option<&str>,
@@ -335,7 +337,7 @@ fn open_on(
         )
     };
     let (w, h) = (w as f32, h as f32);
-    // The display's rect in logical pixels, top-left origin (macOS).
+    // The display's rect in logical pixels, top-left origin (macOS, Windows).
     let display = display_id
         .and_then(|id| cx.find_display(id))
         .or_else(|| cx.primary_display());
@@ -376,7 +378,7 @@ fn open_on(
 /// The Σ split's own daemon connection: a `Window` kind, so the daemon's
 /// `SetVisible` — the overlay's alone — never reaches it, holding only the
 /// top rows.
-#[cfg(any(target_os = "linux", target_os = "macos"))]
+#[cfg(any(target_os = "linux", target_os = "macos", windows))]
 fn split_link(cx: &mut App) -> Result<gpui_kit::Entity<crate::session::Session>, String> {
     use gpui_kit::AppContext as _;
     use wowdps_proto::{ClientKind, ClientState};
@@ -390,11 +392,11 @@ fn split_link(cx: &mut App) -> Result<gpui_kit::Entity<crate::session::Session>,
     Ok(cx.new(|cx| crate::session::Session::running_with(Box::new(client), state, cx)))
 }
 
-/// Neither a layer shell (Linux) nor a floating panel (macOS) is
+/// Neither a layer shell (Linux) nor a floating panel (macOS, Windows) is
 /// available: the overlay is honest about it.
-#[cfg(not(any(target_os = "linux", target_os = "macos")))]
+#[cfg(not(any(target_os = "linux", target_os = "macos", windows)))]
 fn surface(_: &mut App, _: Option<&str>, _: DaemonClient, _: Config) -> Result<(), String> {
-    Err("the overlay needs Linux (wlr-layer-shell) or macOS".to_string())
+    Err("the overlay needs Linux (wlr-layer-shell), macOS or Windows".to_string())
 }
 
 /// How long `edge` of the overlay's output is, in logical pixels: from

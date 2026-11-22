@@ -17,8 +17,8 @@
 //! stacked on the game.
 
 use std::io::Write;
-use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::Path;
+use wowdps_proto::sock;
 
 /// Evict any running overlay and hold the claim for this process, which
 /// exits when a newer overlay takes the claim from it. Failure to claim is
@@ -57,9 +57,9 @@ fn claim_at(path: &Path, on_evicted: impl FnOnce() + Send + 'static) {
     // refuses the connection. Either way the path is ours to reclaim — the
     // incumbent never unlinks it (it exits straight from its acceptor), so
     // this cannot remove a newer claimant's socket.
-    let _ = UnixStream::connect(path);
+    let _ = sock::connect(path);
     let _ = std::fs::remove_file(path);
-    match UnixListener::bind(path) {
+    match sock::bind(path) {
         Ok(listener) => {
             std::thread::spawn(move || {
                 if listener.accept().is_ok() {
@@ -128,12 +128,12 @@ mod tests {
         let dir = Scratch::new("stale");
         let path = dir.sock();
         // A crashed overlay's leftover: the file exists, nobody listens.
-        drop(UnixListener::bind(&path).expect("stale bind"));
+        drop(sock::bind(&path).expect("stale bind"));
         let evicted = Arc::new(AtomicBool::new(false));
         let flag = evicted.clone();
         claim_at(&path, move || flag.store(true, Ordering::SeqCst));
         // The claim is live: a plain connection is the eviction notice.
-        UnixStream::connect(&path).expect("claim not listening");
+        sock::connect(&path).expect("claim not listening");
         wait_for(&evicted);
     }
 
@@ -196,7 +196,7 @@ mod tests {
         }
 
         // The eviction.
-        let _evict = match UnixStream::connect(&path) {
+        let _evict = match sock::connect(&path) {
             Ok(stream) => stream,
             Err(e) => fail(&mut child, &format!("the child holds no claim: {e}")),
         };

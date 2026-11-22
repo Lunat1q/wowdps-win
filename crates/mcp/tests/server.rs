@@ -14,11 +14,11 @@
     clippy::indexing_slicing
 )]
 
-use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
 use std::sync::mpsc;
 use std::thread;
 use std::time::{Duration, Instant};
+use wowdps_proto::sock;
 
 use wowdps_core::tail::SourceSpec;
 use wowdps_daemon::{DaemonOptions, run};
@@ -84,7 +84,7 @@ fn start_daemon_with(tmp: &Temp, log: &str, tweak: impl FnOnce(&mut DaemonOption
     loop {
         // The socket's vnode appears at bind(); listen() follows. A connect
         // in that gap is refused, so readiness is a connect, not exists().
-        if UnixStream::connect(&socket).is_ok() {
+        if sock::connect(&socket).is_ok() {
             break;
         }
         assert!(Instant::now() < deadline, "daemon never bound {socket:?}");
@@ -95,7 +95,7 @@ fn start_daemon_with(tmp: &Temp, log: &str, tweak: impl FnOnce(&mut DaemonOption
     // Ready is a list with a fight on it, asked on a connection of its own
     // that is shut down before the caller connects (a dropped client's
     // reader thread holds the stream open; the shutdown ends it).
-    let stream = UnixStream::connect(&socket).expect("connect");
+    let stream = sock::connect(&socket).expect("connect");
     let closer = stream.try_clone().expect("clone the probe's stream");
     let mut probe = Bridge::over(stream).expect("handshake");
     loop {
@@ -179,7 +179,7 @@ fn the_whole_surface_over_a_real_daemon() {
     }
     let tmp = Temp::new("surface");
     let socket = start_daemon(&tmp);
-    let stream = UnixStream::connect(&socket).expect("connect");
+    let stream = sock::connect(&socket).expect("connect");
     let mut bridge = Bridge::over(stream).expect("handshake");
 
     // ---- handshake + catalog ------------------------------------------------
@@ -589,7 +589,7 @@ fn talent_tools_over_a_fixture_dataset() {
     unsafe { std::env::set_var("WOWDPS_TALENTS", &dataset) };
 
     let socket = start_daemon(&tmp);
-    let stream = UnixStream::connect(&socket).expect("connect");
+    let stream = sock::connect(&socket).expect("connect");
     let mut bridge = Bridge::over(stream).expect("handshake");
 
     let replies = drive(
@@ -658,7 +658,7 @@ fn talent_tools_over_a_fixture_dataset() {
     let text = error_text(&reply);
     assert!(
         text.contains("no Forever talent dataset at")
-            && text.contains("forever/talents.json")
+            && text.contains(&format!("forever{}talents.json", std::path::MAIN_SEPARATOR))
             && text.contains("--product wowf"),
         "{text}"
     );
@@ -899,7 +899,7 @@ fn status_answers_without_a_cursor() {
     }
     let tmp = Temp::new("status");
     let socket = start_daemon(&tmp);
-    let stream = UnixStream::connect(&socket).expect("connect");
+    let stream = sock::connect(&socket).expect("connect");
     let mut bridge = Bridge::over(stream).expect("handshake");
     let replies = drive(&mut bridge, &[&call_line(1, "status", "{}")]);
     let doc = tool_doc(&replies[0]);
@@ -964,7 +964,7 @@ fn load_failures_and_bad_arguments_are_tool_errors() {
     }
     let tmp = Temp::new("errors");
     let socket = start_daemon(&tmp);
-    let stream = UnixStream::connect(&socket).expect("connect");
+    let stream = sock::connect(&socket).expect("connect");
     let mut bridge = Bridge::over(stream).expect("handshake");
     let replies = drive(
         &mut bridge,
@@ -1001,7 +1001,7 @@ fn keystone_visits_list_their_par_timers() {
     }
     let tmp = Temp::new("keystone");
     let socket = start_daemon_on(&tmp, INSTANCE);
-    let stream = UnixStream::connect(&socket).expect("connect");
+    let stream = sock::connect(&socket).expect("connect");
     let mut bridge = Bridge::over(stream).expect("handshake");
     let replies = drive(&mut bridge, &[&call_line(1, "list_fights", "{}")]);
     let doc = tool_doc(&replies[0]);
@@ -1051,7 +1051,7 @@ fn death_recaps_unlogged_builds_and_bridge_argument_checks() {
     }
     let tmp = Temp::new("recap");
     let socket = start_daemon(&tmp);
-    let stream = UnixStream::connect(&socket).expect("connect");
+    let stream = sock::connect(&socket).expect("connect");
     let mut bridge = Bridge::over(stream).expect("handshake");
     let replies = drive(&mut bridge, &[&call_line(1, "list_fights", "{}")]);
     let doc = tool_doc(&replies[0]);
@@ -1115,7 +1115,7 @@ fn death_recaps_unlogged_builds_and_bridge_argument_checks() {
     // logged a build.
     let tmp2 = Temp::new("unlogged");
     let socket = start_daemon_on(&tmp2, INSTANCE);
-    let stream = UnixStream::connect(&socket).expect("connect");
+    let stream = sock::connect(&socket).expect("connect");
     let mut bridge = Bridge::over(stream).expect("handshake");
     let replies = drive(
         &mut bridge,
@@ -1135,6 +1135,7 @@ fn death_recaps_unlogged_builds_and_bridge_argument_checks() {
 /// The overlay's every wording in `status`: a connected overlay is visible,
 /// then hidden by its own report; a supervisor whose spawn fails reports
 /// the failure — and a daemon that goes away mid-session is a tool error.
+#[cfg(unix)]
 #[test]
 fn status_words_the_overlay_and_a_lost_daemon() {
     if crate::test_scratch::process::isolate("status_words_the_overlay_and_a_lost_daemon") {
@@ -1144,8 +1145,8 @@ fn status_words_the_overlay_and_a_lost_daemon() {
 
     let tmp = Temp::new("overlay");
     let socket = start_daemon(&tmp);
-    let mut bridge = Bridge::over(UnixStream::connect(&socket).expect("connect")).expect("hs");
-    let overlay_stream = UnixStream::connect(&socket).expect("connect");
+    let mut bridge = Bridge::over(sock::connect(&socket).expect("connect")).expect("hs");
+    let overlay_stream = sock::connect(&socket).expect("connect");
     let mut overlay = DaemonClient::over(overlay_stream, ClientKind::Overlay).expect("hs");
     let status = |bridge: &mut Bridge| {
         let replies = drive(bridge, &[&call_line(1, "status", "{}")]);
@@ -1202,7 +1203,7 @@ fn status_words_the_overlay_and_a_lost_daemon() {
         opts.auto_overlay = true;
         opts.gui_bin = Some(tmp2_gui());
     });
-    let mut bridge = Bridge::over(UnixStream::connect(&socket).expect("connect")).expect("hs");
+    let mut bridge = Bridge::over(sock::connect(&socket).expect("connect")).expect("hs");
     let deadline = Instant::now() + DEADLINE;
     loop {
         let doc = status(&mut bridge);
@@ -1219,7 +1220,7 @@ fn status_words_the_overlay_and_a_lost_daemon() {
 
     // Shut the daemon down behind the bridge's back.
     use std::io::Write as _;
-    UnixStream::connect(&socket)
+    sock::connect(&socket)
         .expect("connect")
         .write_all(&ClientMsg::Shutdown.encode())
         .expect("shutdown");
@@ -1233,6 +1234,7 @@ fn status_words_the_overlay_and_a_lost_daemon() {
     assert!(text.contains("daemon connection lost"), "{text}");
 }
 
+#[cfg(unix)]
 fn tmp2_gui() -> PathBuf {
     PathBuf::from("/nonexistent/wowdps-gui-for-tests")
 }
@@ -1285,7 +1287,7 @@ fn history_tools_answer_over_the_store() {
     let tmp = Temp::new("history");
     let opts = history_opts(&tmp);
     let socket = start_daemon_with(&tmp, FIXTURE, |o| o.history = Some(opts));
-    let mut bridge = Bridge::over(UnixStream::connect(&socket).expect("connect")).expect("bridge");
+    let mut bridge = Bridge::over(sock::connect(&socket).expect("connect")).expect("bridge");
     wait_for_store(&mut bridge, 2);
 
     // Everything, newest first.
@@ -1638,7 +1640,7 @@ fn history_tools_answer_empty_without_a_store() {
     }
     let tmp = Temp::new("nohistory");
     let socket = start_daemon(&tmp);
-    let mut bridge = Bridge::over(UnixStream::connect(&socket).expect("connect")).expect("bridge");
+    let mut bridge = Bridge::over(sock::connect(&socket).expect("connect")).expect("bridge");
     let reply = drive(
         &mut bridge,
         &[
@@ -1691,7 +1693,7 @@ fn an_imported_fight_answers_its_card_meter() {
     let tmp = Temp::new("imported");
     let opts = history_opts(&tmp);
     let socket = start_daemon_with(&tmp, FIXTURE, |o| o.history = Some(opts));
-    let mut bridge = Bridge::over(UnixStream::connect(&socket).expect("connect")).expect("bridge");
+    let mut bridge = Bridge::over(sock::connect(&socket).expect("connect")).expect("bridge");
     wait_for_store(&mut bridge, 2);
     // A replay this build cut: the kill's, once the store has it.
     let dir = tmp.0.join("history").join("replay");
@@ -1708,11 +1710,8 @@ fn an_imported_fight_answers_its_card_meter() {
         assert!(Instant::now() < deadline, "no replay landed");
         thread::sleep(Duration::from_millis(20));
     };
-    let mut client = DaemonClient::over(
-        UnixStream::connect(&socket).expect("connect"),
-        ClientKind::Mcp,
-    )
-    .expect("client");
+    let mut client = DaemonClient::over(sock::connect(&socket).expect("connect"), ClientKind::Mcp)
+        .expect("client");
     client.send(&ClientMsg::ImportReplay {
         req_id: 1,
         card: Box::new(ImportedCard {
@@ -1822,7 +1821,7 @@ fn key_cards_word_par_and_member_boss_pins_name_the_key() {
     let tmp = Temp::new("keypin");
     let opts = history_opts(&tmp);
     let socket = start_daemon_with(&tmp, INSTANCE, |o| o.history = Some(opts));
-    let mut bridge = Bridge::over(UnixStream::connect(&socket).expect("connect")).expect("bridge");
+    let mut bridge = Bridge::over(sock::connect(&socket).expect("connect")).expect("bridge");
     let deadline = Instant::now() + DEADLINE;
     let key = loop {
         let reply = drive(
@@ -1896,7 +1895,7 @@ fn me_of_owner(tag: &str, name: &str) -> Json {
     let mut opts = history_opts(&tmp);
     opts.characters = vec![name.to_string()];
     let socket = start_daemon_with(&tmp, FIXTURE, |o| o.history = Some(opts));
-    let mut bridge = Bridge::over(UnixStream::connect(&socket).expect("connect")).expect("bridge");
+    let mut bridge = Bridge::over(sock::connect(&socket).expect("connect")).expect("bridge");
     wait_for_store(&mut bridge, 2);
     let reply = drive(
         &mut bridge,
@@ -2003,7 +2002,7 @@ fn taken_daemon(tag: &str, owner: Option<&str>) -> (Temp, Bridge) {
     let mut opts = history_opts(&tmp);
     opts.characters = owner.map(|o| vec![o.to_string()]).unwrap_or_default();
     let socket = start_daemon_with(&tmp, TAKEN, |o| o.history = Some(opts));
-    let mut bridge = Bridge::over(UnixStream::connect(&socket).expect("connect")).expect("bridge");
+    let mut bridge = Bridge::over(sock::connect(&socket).expect("connect")).expect("bridge");
     wait_for_store(&mut bridge, 1);
     (tmp, bridge)
 }
@@ -2413,7 +2412,7 @@ fn support_daemon(tag: &str, owner: Option<&str>) -> (Temp, Bridge) {
     let mut opts = history_opts(&tmp);
     opts.characters = owner.map(|o| vec![o.to_string()]).unwrap_or_default();
     let socket = start_daemon_with(&tmp, SUPPORT, |o| o.history = Some(opts));
-    let mut bridge = Bridge::over(UnixStream::connect(&socket).expect("connect")).expect("bridge");
+    let mut bridge = Bridge::over(sock::connect(&socket).expect("connect")).expect("bridge");
     wait_for_store(&mut bridge, 1);
     (tmp, bridge)
 }
@@ -2756,7 +2755,7 @@ fn a_survivor_gets_an_empty_death_recap_not_an_error() {
     }
     let tmp = Temp::new("survived");
     let socket = start_daemon(&tmp);
-    let stream = UnixStream::connect(&socket).expect("connect");
+    let stream = sock::connect(&socket).expect("connect");
     let mut bridge = Bridge::over(stream).expect("handshake");
     let replies = drive(&mut bridge, &[&call_line(1, "list_fights", "{}")]);
     let doc = tool_doc(&replies[0]);
@@ -2823,7 +2822,7 @@ fn the_fight_tool_carries_the_raid_timeline() {
     }
     let tmp = Temp::new("raid");
     let socket = start_daemon(&tmp);
-    let stream = UnixStream::connect(&socket).expect("connect");
+    let stream = sock::connect(&socket).expect("connect");
     let mut bridge = Bridge::over(stream).expect("handshake");
     let list = tool_doc(&drive(&mut bridge, &[&call_line(1, "list_fights", "{}")])[0]);
     let mut deaths_seen = 0;
@@ -2900,7 +2899,7 @@ fn the_real_daemon_marks_the_configured_character_mine() {
     let mut opts = history_opts(&tmp);
     opts.characters = vec!["Mírelle".to_string()];
     let socket = start_daemon_with(&tmp, FIXTURE, |o| o.history = Some(opts));
-    let mut bridge = Bridge::over(UnixStream::connect(&socket).expect("connect")).expect("bridge");
+    let mut bridge = Bridge::over(sock::connect(&socket).expect("connect")).expect("bridge");
     wait_for_store(&mut bridge, 2);
     let list = tool_doc(&drive(&mut bridge, &[&call_line(1, "list_fights", "{}")])[0]);
     let mut marked = 0;
@@ -2951,7 +2950,7 @@ fn a_drill_s_abilities_carry_the_ability_tree() {
     }
     let tmp = Temp::new("tree");
     let socket = start_daemon_on(&tmp, TREE);
-    let stream = UnixStream::connect(&socket).expect("connect");
+    let stream = sock::connect(&socket).expect("connect");
     let mut bridge = Bridge::over(stream).expect("handshake");
     let replies = drive(&mut bridge, &[&call_line(1, "list_fights", "{}")]);
     let doc = tool_doc(&replies[0]);
@@ -3050,7 +3049,7 @@ fn an_empowered_ability_carries_its_stages() {
     }
     let tmp = Temp::new("empower");
     let socket = start_daemon_on(&tmp, TREE);
-    let stream = UnixStream::connect(&socket).expect("connect");
+    let stream = sock::connect(&socket).expect("connect");
     let mut bridge = Bridge::over(stream).expect("handshake");
     let replies = drive(&mut bridge, &[&call_line(1, "list_fights", "{}")]);
     let doc = tool_doc(&replies[0]);
@@ -3225,7 +3224,7 @@ fn the_live_tools_follow_or_pin_an_edition() {
         "WoWCombatLog-072726_200000.txt",
         false,
     );
-    let mut bridge = Bridge::over(UnixStream::connect(&socket).expect("connect")).expect("bridge");
+    let mut bridge = Bridge::over(sock::connect(&socket).expect("connect")).expect("bridge");
 
     // Both sources come up; Forever's log was written last, so it is live.
     let deadline = Instant::now() + DEADLINE;
@@ -3616,7 +3615,7 @@ fn stored_lookups_take_no_prefix_and_prefer_the_account_s_own() {
         "WoWCombatLog-072726_200000.txt",
         Some(vec!["Tharokk Emberfell".to_string()]),
     );
-    let mut bridge = Bridge::over(UnixStream::connect(&socket).expect("connect")).expect("bridge");
+    let mut bridge = Bridge::over(sock::connect(&socket).expect("connect")).expect("bridge");
     let party = |bridge: &mut Bridge| {
         let doc = doc_of(
             bridge,
@@ -3772,7 +3771,7 @@ fn a_live_lookup_takes_the_account_s_own_among_namesakes() {
         ..history_opts(&tmp)
     };
     let socket = start_daemon_with(&tmp, FOREVER_FIXTURE, |o| o.history = Some(opts));
-    let mut bridge = Bridge::over(UnixStream::connect(&socket).expect("connect")).expect("bridge");
+    let mut bridge = Bridge::over(sock::connect(&socket).expect("connect")).expect("bridge");
     // "Mine" is published once the store has answered: wait for its card.
     let deadline = Instant::now() + DEADLINE;
     while fights(&doc_of(&mut bridge, "history", "{}")).is_empty() {
@@ -3853,7 +3852,7 @@ fn the_history_tools_keep_editions_apart() {
         "WoWCombatLog-072726_200000.txt",
         true,
     );
-    let mut bridge = Bridge::over(UnixStream::connect(&socket).expect("connect")).expect("bridge");
+    let mut bridge = Bridge::over(sock::connect(&socket).expect("connect")).expect("bridge");
     // Six pulls, and Retail's visit's Overall: its log is swept whole, not
     // tailed, once a newer log sits in its folder.
     wait_for_store(&mut bridge, 7);

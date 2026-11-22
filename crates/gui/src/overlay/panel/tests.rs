@@ -351,6 +351,7 @@ fn the_overlay_re_pins_when_the_live_edition_moves(cx: &mut TestAppContext) {
 /// (`Rehome`); once the live edition moves to Forever's, whose workspace is
 /// up, it shows again and belongs on Forever's monitor. The tracker runs on
 /// a fake Hyprland and a fake `/proc`, in real threads.
+#[cfg(unix)]
 #[gpui_kit::test]
 fn the_overlay_follows_the_live_editions_window(cx: &mut TestAppContext) {
     use std::cell::RefCell;
@@ -588,7 +589,7 @@ fn a_row_opens_its_drill_and_a_badge_picks_its_player(cx: &mut TestAppContext) {
 /// there; the shared math still compiles in.
 #[gpui_kit::test]
 #[cfg_attr(
-    target_os = "macos",
+    any(target_os = "macos", windows),
     ignore = "macOS re-anchors by reopening; resize and the drag slide are Linux semantics"
 )]
 fn the_header_collapses_the_panel_and_the_tab_expands_it(cx: &mut TestAppContext) {
@@ -613,7 +614,7 @@ fn the_header_collapses_the_panel_and_the_tab_expands_it(cx: &mut TestAppContext
 
 #[gpui_kit::test]
 #[cfg_attr(
-    target_os = "macos",
+    any(target_os = "macos", windows),
     ignore = "macOS re-anchors by reopening; resize and the drag slide are Linux semantics"
 )]
 fn a_drag_on_the_grip_slides_the_content_along_the_edge_and_is_remembered(cx: &mut TestAppContext) {
@@ -656,7 +657,7 @@ fn a_drag_on_the_grip_slides_the_content_along_the_edge_and_is_remembered(cx: &m
 
 #[gpui_kit::test]
 #[cfg_attr(
-    target_os = "macos",
+    any(target_os = "macos", windows),
     ignore = "macOS re-anchors by reopening; resize and the drag slide are Linux semantics"
 )]
 fn hidden_draws_nothing_and_comes_back_whole(cx: &mut TestAppContext) {
@@ -935,7 +936,7 @@ fn compared<C: AppContext>(cx: &mut C, rig: &Rig) {
 
 #[gpui_kit::test]
 #[cfg_attr(
-    target_os = "macos",
+    any(target_os = "macos", windows),
     ignore = "macOS re-anchors by reopening; resize and the drag slide are Linux semantics"
 )]
 fn two_picks_open_the_comparison_which_backs_out_one_level_at_a_time(cx: &mut TestAppContext) {

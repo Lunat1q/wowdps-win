@@ -396,13 +396,18 @@ mod tests {
         // roots below exist only off macOS — discovery checks the
         // Applications roots there, which a machine with the game
         // installed fills (as core's cli tests note).
-        #[cfg(not(target_os = "macos"))]
+        #[cfg(all(unix, not(target_os = "macos")))]
         assert!(locate().unwrap_err().contains("no WoW install found"));
         std::fs::write(
             cfg.join("wowdps").join("config.toml"),
             format!(
                 "logs_dir = \"{}\"\n",
-                wow.join("_retail_").join("Logs").display()
+                // A basic string: a Windows path's `\` is escaped.
+                wow.join("_retail_")
+                    .join("Logs")
+                    .display()
+                    .to_string()
+                    .replace('\\', "\\\\")
             ),
         )
         .unwrap();
@@ -410,7 +415,7 @@ mod tests {
         std::fs::remove_file(cfg.join("wowdps").join("config.toml")).unwrap();
 
         // One Steam install: found; two: ambiguous.
-        #[cfg(not(target_os = "macos"))]
+        #[cfg(all(unix, not(target_os = "macos")))]
         {
             let compat = home.join(".steam/steam/steamapps/compatdata");
             let steam1 = compat.join("1/pfx/drive_c/Program Files (x86)/World of Warcraft");

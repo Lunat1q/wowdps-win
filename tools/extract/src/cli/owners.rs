@@ -243,6 +243,7 @@ mod tests {
     /// A committed file is found whatever spells it: absolute, relative
     /// to the checkout or to its own directory, through `..`, through a
     /// symlinked directory; and every table's and twin's, not one alone.
+    #[cfg(unix)]
     #[test]
     fn a_committed_file_is_found_however_it_is_spelled() {
         let root = checkout();
@@ -284,6 +285,7 @@ mod tests {
     /// file over the name, which replaces the link where the committed file
     /// is. The target is no committed file for it; a data-home cache that
     /// is a link is found as well.
+    #[cfg(unix)]
     #[test]
     fn a_committed_file_replaced_by_a_symlink_is_found() {
         let dir = scratch("linked");
@@ -382,6 +384,7 @@ mod tests {
     /// directory, is where the write lands once `missing` is made. And a
     /// data home reached through a symlink, its `wowdps/` not made yet, is
     /// the same place by either spelling, from either side.
+    #[cfg(unix)]
     #[test]
     fn a_symlink_above_a_missing_component_is_followed() {
         let dir = scratch("missing");
@@ -506,6 +509,7 @@ mod tests {
     /// A link from one edition's committed table to another's reaches both:
     /// what it resolves to and where a write to it lands. Neither edition's
     /// run may write through it.
+    #[cfg(unix)]
     #[test]
     fn a_link_between_two_editions_tables_is_refused_to_both() {
         let dir = scratch("cross");

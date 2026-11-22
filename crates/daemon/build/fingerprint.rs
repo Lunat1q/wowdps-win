@@ -85,7 +85,14 @@ pub fn hashed(root: &Path, sources: &[Unit], left_out: &[&str]) -> Result<Hashed
         .filter(|(file, _)| !tests.iter().any(|t| file.starts_with(t)))
         .map(|(file, text)| {
             let name = file.strip_prefix(root).unwrap_or(&file);
-            (name.to_string_lossy().into_owned(), text)
+            // `/` on every system, so a checkout hashes alike everywhere.
+            let name = name.to_string_lossy();
+            let name = if cfg!(windows) {
+                name.replace('\\', "/")
+            } else {
+                name.into_owned()
+            };
+            (name, text)
         })
         .collect();
     Ok(Hashed { files, watched })

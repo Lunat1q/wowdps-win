@@ -10,7 +10,7 @@ pub fn daemon_bin() -> PathBuf {
 
 fn beside(exe: Option<&Path>) -> PathBuf {
     exe.and_then(Path::parent)
-        .map(|dir| dir.join("wowdps"))
+        .map(|dir| dir.join(format!("wowdps{}", std::env::consts::EXE_SUFFIX)))
         .filter(|p| p.exists())
         .unwrap_or_else(|| PathBuf::from("wowdps"))
 }
@@ -31,8 +31,9 @@ mod tests {
             PathBuf::from("wowdps"),
             "no sibling yet"
         );
-        std::fs::write(dir.join("wowdps"), "").unwrap();
-        assert_eq!(beside(Some(&gui)), dir.join("wowdps"));
+        let daemon = dir.join(format!("wowdps{}", std::env::consts::EXE_SUFFIX));
+        std::fs::write(&daemon, "").unwrap();
+        assert_eq!(beside(Some(&gui)), daemon);
         assert_eq!(beside(None), PathBuf::from("wowdps"));
         let _ = std::fs::remove_dir_all(&dir);
     }

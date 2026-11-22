@@ -2,7 +2,7 @@
 
 # wowdps
 
-A World of Warcraft combat-log damage meter for Linux. A headless daemon
+A World of Warcraft combat-log damage meter for Linux, macOS and Windows. A headless daemon
 tails the combat log; a Wayland layer-shell **overlay**, a windowed **GUI**
 and a **TUI** are thin clients over a unix socket.
 
@@ -73,6 +73,22 @@ The GUI and overlay (`wowdps-gui`, on Zed's GPUI) need pkg-config,
 libxkbcommon, libxcb and fontconfig to build, and wayland, vulkan-loader and
 libGL at runtime. On NixOS use the dev shell (`nix develop` or devenv), or
 `nix build .#wowdps-gui`, which the modules put on the daemon's PATH.
+
+On Windows, build with the MSVC toolchain (Visual Studio Build Tools; the
+history reader compiles its bundled DuckDB with it). There:
+
+- The daemon listens on loopback TCP, not a unix socket. The socket path
+  (`%LOCALAPPDATA%\wowdps\run\wowdps-v<N>.sock`) is a file holding the port
+  and a random token, and a client must send the token first.
+- `~` is `%USERPROFILE%`: config, caches and the history store sit under
+  `~\.config`, `~\.cache` and `~\.local\share`, as they do on Linux.
+- Install discovery checks `World of Warcraft` under `%ProgramFiles(x86)%`
+  and `%ProgramFiles%`. Anywhere else, set `logs_dir` or `WOWDPS_WOW_DIR`.
+- The game watcher finds `Wow.exe` by its process name only, not its path,
+  so it cannot tell editions apart. The overlay still shows while the game
+  runs, and the live edition goes by which log was written last.
+- The overlay is a topmost floating panel, as on macOS. It shows over a
+  game running in windowed or borderless mode, not in exclusive fullscreen.
 
 ## Use
 

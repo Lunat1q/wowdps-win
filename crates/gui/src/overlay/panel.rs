@@ -111,7 +111,7 @@ pub struct Overlay {
     sized: Option<(u32, u32)>,
     /// macOS: the content outgrew the window and a resize would keep the
     /// wrong corner — render asks for a re-anchor on this.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     reopen: bool,
     /// Each graph's own state: the drill's, or a comparison's two.
     graphs: [graph::Shared; 2],
@@ -188,7 +188,7 @@ impl Overlay {
             } else {
                 wowdps_gui_logic::hypr::socket_dir()
             },
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             reopen: false,
             _game: None,
             _theme_watch: None,
@@ -520,7 +520,7 @@ impl Render for Overlay {
         let placed = self.place(window, cx);
         // macOS: a size change re-anchors — the new window opens before
         // the old one goes, so the app never stands without a surface.
-        #[cfg(target_os = "macos")]
+        #[cfg(any(target_os = "macos", windows))]
         if std::mem::take(&mut self.reopen) {
             cx.emit(Reanchor(self.cfg.edge));
         }

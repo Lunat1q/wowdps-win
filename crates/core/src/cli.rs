@@ -85,7 +85,7 @@ pub fn sibling_logs(logs_dir: &Path, followed: &[Edition]) -> Vec<(Edition, Path
 /// the install's other followed products' folders are followed beside it
 /// ([`sibling_logs`]): `$WOWDPS_WOW_DIR` when it names an install, else the most recently
 /// updated install found under the conventional install roots (Battle.net's
-/// on macOS, Steam's Proton prefixes elsewhere). `None` when
+/// on macOS and Windows, Steam's Proton prefixes elsewhere). `None` when
 /// nothing is found — the daemon reports that instead of tailing a
 /// made-up path.
 pub fn default_logs_dir() -> Option<PathBuf> {
@@ -95,7 +95,9 @@ pub fn default_logs_dir() -> Option<PathBuf> {
             return Some(retail_logs(&dir));
         }
     }
-    let home = std::env::var_os("HOME").map(PathBuf::from)?;
+    let home = std::env::var_os("HOME")
+        .or_else(|| std::env::var_os("USERPROFILE").filter(|_| cfg!(windows)))
+        .map(PathBuf::from)?;
     newest_install(discover_wow_installs(&home)).map(|w| retail_logs(&w))
 }
 
@@ -121,7 +123,16 @@ pub fn discover_wow_installs(home: &Path) -> Vec<PathBuf> {
     for root in [PathBuf::from("/Applications"), home.join("Applications")] {
         consider(root.join("World of Warcraft"), &mut found);
     }
-    #[cfg(not(target_os = "macos"))]
+    // Battle.net's default install folders.
+    #[cfg(windows)]
+    for var in ["ProgramFiles(x86)", "ProgramFiles"] {
+        if let Some(root) = std::env::var_os(var) {
+            consider(PathBuf::from(root).join("World of Warcraft"), &mut found);
+        }
+    }
+    #[cfg(windows)]
+    let _ = home;
+    #[cfg(all(unix, not(target_os = "macos")))]
     {
         let roots = [
             home.join(".local/share/Steam"),
@@ -450,7 +461,7 @@ mod tests {
     // The compatdata roots exist only off macOS, where discovery checks
     // /Applications — a machine with the game installed would leak into
     // these assertions.
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(all(unix, not(target_os = "macos")))]
     #[test]
     fn install_discovery_scans_steam_prefixes_and_prefers_the_newest() {
         let home =
@@ -721,10 +732,10 @@ mod tests {
         // macOS it scans the Applications roots a real machine may fill,
         // so only Linux asserts the fall-through.
         unsafe { std::env::set_var("WOWDPS_WOW_DIR", &home) };
-        #[cfg(not(target_os = "macos"))]
+        #[cfg(all(unix, not(target_os = "macos")))]
         assert_eq!(default_logs_dir(), None);
         unsafe { std::env::remove_var("WOWDPS_WOW_DIR") };
-        #[cfg(not(target_os = "macos"))]
+        #[cfg(all(unix, not(target_os = "macos")))]
         assert_eq!(default_logs_dir(), None);
         match saved_home {
             Some(h) => unsafe { std::env::set_var("HOME", h) },

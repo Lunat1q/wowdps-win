@@ -108,7 +108,7 @@ impl Config {
         let base = std::env::var_os("XDG_CONFIG_HOME")
             .filter(|v| !v.is_empty())
             .map(PathBuf::from)
-            .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config")))
+            .or_else(|| wowdps_proto::dirs::home().map(|h| PathBuf::from(h).join(".config")))
             .unwrap_or_default();
         base.join("wowdps/config.toml")
     }
@@ -125,11 +125,12 @@ impl Config {
     /// path exists: a spawn that fails names it in the overlay's `Failed`.
     pub fn gui_bin(&self, exe: Option<&Path>) -> PathBuf {
         let name = PathBuf::from(&self.gui_binary);
-        if self.gui_binary.contains('/') {
+        if self.gui_binary.contains('/') || (cfg!(windows) && self.gui_binary.contains('\\')) {
             return name;
         }
+        let file = format!("{}{}", self.gui_binary, std::env::consts::EXE_SUFFIX);
         exe.and_then(Path::parent)
-            .map(|dir| dir.join(&name))
+            .map(|dir| dir.join(&file))
             .filter(|p| p.exists())
             .unwrap_or(name)
     }
@@ -390,17 +391,15 @@ overlay_exit_grace_secs = 60
             crate::test_scratch::root().join(format!("wowdps-config-gui-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
-        std::fs::write(dir.join("wowdps-gui-dev"), "").unwrap();
+        let sibling = dir.join(format!("wowdps-gui-dev{}", std::env::consts::EXE_SUFFIX));
+        std::fs::write(&sibling, "").unwrap();
         let exe = dir.join("wowdps");
         let named = |v: &str| Config {
             gui_binary: v.to_string(),
             ..Config::default()
         };
 
-        assert_eq!(
-            named("wowdps-gui-dev").gui_bin(Some(&exe)),
-            dir.join("wowdps-gui-dev")
-        );
+        assert_eq!(named("wowdps-gui-dev").gui_bin(Some(&exe)), sibling);
         // No sibling, or no daemon binary to be beside: the bare name.
         assert_eq!(
             Config::default().gui_bin(Some(&exe)),
@@ -498,7 +497,7 @@ logs_dir = "/ok"   # with a trailing comment
         assert_eq!(cfg.overlay_exit_grace_secs, 7);
 
         unsafe { std::env::set_var("XDG_CONFIG_HOME", "") };
-        match std::env::var_os("HOME") {
+        match wowdps_proto::dirs::home() {
             Some(home) => assert_eq!(
                 Config::path(),
                 PathBuf::from(home).join(".config/wowdps/config.toml")

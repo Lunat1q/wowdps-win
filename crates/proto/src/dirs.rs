@@ -71,8 +71,20 @@ impl Base {
     /// The directory, as this process's environment says.
     pub fn dir(self) -> Option<PathBuf> {
         let var = std::env::var_os(self.var());
-        let home = std::env::var_os("HOME");
+        let home = home();
         self.resolve(var.as_deref(), home.as_deref())
+    }
+}
+
+/// `$HOME`, else (Windows, which seldom sets it) `%USERPROFILE%`: the
+/// dot-folders sit under the user's profile there as they do on unix.
+pub fn home() -> Option<std::ffi::OsString> {
+    let set = |v: Option<std::ffi::OsString>| v.filter(|v| !v.is_empty());
+    let home = set(std::env::var_os("HOME"));
+    if cfg!(windows) {
+        home.or_else(|| set(std::env::var_os("USERPROFILE")))
+    } else {
+        home
     }
 }
 
@@ -163,6 +175,7 @@ mod tests {
         Some(OsStr::new(s))
     }
 
+    #[cfg(unix)]
     #[test]
     fn a_set_absolute_variable_wins() {
         assert_eq!(
