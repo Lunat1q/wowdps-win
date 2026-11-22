@@ -268,7 +268,7 @@ mod tests {
     /// the overlay rebuilds and re-applies on every config change.
     #[gpui_kit::test]
     fn a_switch_frees_the_theme_it_replaces(cx: &mut TestAppContext) {
-        cx.update(gpui_kit::init);
+        cx.update(crate::init);
         // A theme as a config builds one: its words shared, not compiled in.
         let mut mine = NAVY.clone();
         mine.name = wowdps_gui_logic::theme::Text::from("mine");
@@ -396,7 +396,7 @@ mod tests {
     /// slots that draw the chrome.
     #[gpui_kit::test]
     fn a_definition_drives_kit_and_look_alike(cx: &mut TestAppContext) {
-        cx.update(gpui_kit::init);
+        cx.update(crate::init);
         cx.update(|cx| apply(&NAVY, None, cx));
         cx.update(|cx| {
             let theme = Theme::global(cx);
