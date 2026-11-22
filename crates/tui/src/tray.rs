@@ -1,0 +1,371 @@
+//! The running daemon's tray icon on Windows: a left click opens the meter;
+//! the right-click menu opens it or quits wowdps — every process run from
+//! this binary's folder (the window, the overlay, a TUI, the MCP server),
+//! then the daemon itself. Plain Win32 through `extern "system"`, no crate.
+
+use std::ffi::c_void;
+use std::sync::atomic::{AtomicIsize, Ordering};
+use std::time::Duration;
+
+type Hwnd = isize;
+type WndProc = extern "system" fn(Hwnd, u32, usize, isize) -> isize;
+
+const WM_NULL: u32 = 0x0000;
+const WM_LBUTTONUP: u32 = 0x0202;
+const WM_RBUTTONUP: u32 = 0x0205;
+/// What the icon sends its window (`WM_APP + 1`).
+const WM_TRAY: u32 = 0x8001;
+const NIM_ADD: u32 = 0;
+const NIM_DELETE: u32 = 2;
+const NIF_MESSAGE: u32 = 0x1;
+const NIF_ICON: u32 = 0x2;
+const NIF_TIP: u32 = 0x4;
+const MF_STRING: u32 = 0x0;
+const MF_SEPARATOR: u32 = 0x800;
+const TPM_RIGHTBUTTON: u32 = 0x2;
+const TPM_RETURNCMD: u32 = 0x100;
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+const ID_OPEN: usize = 1;
+const ID_QUIT: usize = 2;
+
+#[repr(C)]
+struct WndClassW {
+    style: u32,
+    wnd_proc: WndProc,
+    cls_extra: i32,
+    wnd_extra: i32,
+    instance: isize,
+    icon: isize,
+    cursor: isize,
+    background: isize,
+    menu_name: *const u16,
+    class_name: *const u16,
+}
+
+#[repr(C)]
+#[derive(Default)]
+struct Point {
+    x: i32,
+    y: i32,
+}
+
+#[repr(C)]
+#[derive(Default)]
+struct Msg {
+    hwnd: Hwnd,
+    message: u32,
+    w_param: usize,
+    l_param: isize,
+    time: u32,
+    pt: Point,
+    private: u32,
+}
+
+#[repr(C)]
+struct NotifyIconDataW {
+    size: u32,
+    hwnd: Hwnd,
+    id: u32,
+    flags: u32,
+    callback_message: u32,
+    icon: isize,
+    tip: [u16; 128],
+    state: u32,
+    state_mask: u32,
+    info: [u16; 256],
+    version: u32,
+    info_title: [u16; 64],
+    info_flags: u32,
+    guid: [u8; 16],
+    balloon_icon: isize,
+}
+
+#[link(name = "user32")]
+unsafe extern "system" {
+    fn RegisterClassW(class: *const WndClassW) -> u16;
+    #[allow(clippy::too_many_arguments)]
+    fn CreateWindowExW(
+        ex_style: u32,
+        class: *const u16,
+        title: *const u16,
+        style: u32,
+        x: i32,
+        y: i32,
+        w: i32,
+        h: i32,
+        parent: Hwnd,
+        menu: isize,
+        instance: isize,
+        param: *const c_void,
+    ) -> Hwnd;
+    fn DefWindowProcW(hwnd: Hwnd, msg: u32, w: usize, l: isize) -> isize;
+    fn GetMessageW(msg: *mut Msg, hwnd: Hwnd, min: u32, max: u32) -> i32;
+    fn TranslateMessage(msg: *const Msg) -> i32;
+    fn DispatchMessageW(msg: *const Msg) -> isize;
+    fn CreatePopupMenu() -> isize;
+    fn AppendMenuW(menu: isize, flags: u32, id: usize, text: *const u16) -> i32;
+    fn TrackPopupMenu(
+        menu: isize,
+        flags: u32,
+        x: i32,
+        y: i32,
+        reserved: i32,
+        hwnd: Hwnd,
+        rect: *const c_void,
+    ) -> i32;
+    fn DestroyMenu(menu: isize) -> i32;
+    fn SetForegroundWindow(hwnd: Hwnd) -> i32;
+    fn GetCursorPos(pt: *mut Point) -> i32;
+    fn PostMessageW(hwnd: Hwnd, msg: u32, w: usize, l: isize) -> i32;
+    fn CreateIcon(
+        instance: isize,
+        w: i32,
+        h: i32,
+        planes: u8,
+        bits: u8,
+        and: *const u8,
+        xor: *const u8,
+    ) -> isize;
+}
+
+#[link(name = "shell32")]
+unsafe extern "system" {
+    fn Shell_NotifyIconW(message: u32, data: *const NotifyIconDataW) -> i32;
+}
+
+#[link(name = "kernel32")]
+unsafe extern "system" {
+    fn GetModuleHandleW(name: *const u16) -> isize;
+}
+
+/// The icon's window, for [`remove`] from the daemon's thread (0: none).
+static WINDOW: AtomicIsize = AtomicIsize::new(0);
+
+/// Show the icon from a thread of its own. It waits a moment first: a
+/// daemon that loses the lockfile to a running one exits before then and
+/// never flashes a second icon.
+pub fn spawn() {
+    let _ = std::thread::Builder::new().name("tray".into()).spawn(|| {
+        std::thread::sleep(Duration::from_millis(500));
+        run();
+    });
+}
+
+/// Take the icon down (the daemon is leaving): a process that exits with
+/// its icon up leaves a ghost in the tray until the pointer passes over it.
+pub fn remove() {
+    let hwnd = WINDOW.swap(0, Ordering::SeqCst);
+    if hwnd != 0 {
+        let data = icon_data(hwnd, 0);
+        // SAFETY: `data` is a valid NOTIFYICONDATAW for the call's length.
+        unsafe { Shell_NotifyIconW(NIM_DELETE, &data) };
+    }
+}
+
+fn run() {
+    let class = wide("wowdps-tray");
+    // SAFETY: plain Win32 calls with valid, NUL-terminated strings and
+    // structs that outlive each call; the window lives as long as the loop.
+    unsafe {
+        let instance = GetModuleHandleW(std::ptr::null());
+        let wc = WndClassW {
+            style: 0,
+            wnd_proc,
+            cls_extra: 0,
+            wnd_extra: 0,
+            instance,
+            icon: 0,
+            cursor: 0,
+            background: 0,
+            menu_name: std::ptr::null(),
+            class_name: class.as_ptr(),
+        };
+        if RegisterClassW(&wc) == 0 {
+            return;
+        }
+        // A plain hidden window, not a message-only one: the menu needs a
+        // window that can come to the foreground.
+        let hwnd = CreateWindowExW(
+            0,
+            class.as_ptr(),
+            class.as_ptr(),
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            instance,
+            std::ptr::null(),
+        );
+        if hwnd == 0 {
+            return;
+        }
+        let pixels = icon_pixels();
+        let mask = [0u8; (SIDE * SIDE / 8) as usize];
+        let icon = CreateIcon(instance, SIDE, SIDE, 1, 32, mask.as_ptr(), pixels.as_ptr());
+        let data = icon_data(hwnd, icon);
+        if Shell_NotifyIconW(NIM_ADD, &data) == 0 {
+            return;
+        }
+        WINDOW.store(hwnd, Ordering::SeqCst);
+        let mut msg = Msg::default();
+        while GetMessageW(&mut msg, 0, 0, 0) > 0 {
+            TranslateMessage(&msg);
+            DispatchMessageW(&msg);
+        }
+    }
+}
+
+extern "system" fn wnd_proc(hwnd: Hwnd, msg: u32, w: usize, l: isize) -> isize {
+    if msg == WM_TRAY {
+        match (l & 0xffff) as u32 {
+            WM_LBUTTONUP => open_meter(),
+            WM_RBUTTONUP => menu(hwnd),
+            _ => {}
+        }
+        return 0;
+    }
+    // SAFETY: the default handling of a message this window was sent.
+    unsafe { DefWindowProcW(hwnd, msg, w, l) }
+}
+
+fn menu(hwnd: Hwnd) {
+    let open_label = wide("Open meter");
+    let quit_label = wide("Quit wowdps");
+    // SAFETY: a menu built, shown and destroyed here, on the window's own
+    // thread; the strings outlive the calls.
+    let picked = unsafe {
+        let menu = CreatePopupMenu();
+        AppendMenuW(menu, MF_STRING, ID_OPEN, open_label.as_ptr());
+        AppendMenuW(menu, MF_SEPARATOR, 0, std::ptr::null());
+        AppendMenuW(menu, MF_STRING, ID_QUIT, quit_label.as_ptr());
+        let mut pt = Point::default();
+        GetCursorPos(&mut pt);
+        // Without it the menu stays up after a click elsewhere.
+        SetForegroundWindow(hwnd);
+        let picked = TrackPopupMenu(
+            menu,
+            TPM_RIGHTBUTTON | TPM_RETURNCMD,
+            pt.x,
+            pt.y,
+            0,
+            hwnd,
+            std::ptr::null(),
+        );
+        PostMessageW(hwnd, WM_NULL, 0, 0);
+        DestroyMenu(menu);
+        picked
+    };
+    match picked as usize {
+        ID_OPEN => open_meter(),
+        ID_QUIT => quit(),
+        _ => {}
+    }
+}
+
+fn open_meter() {
+    let _ = std::process::Command::new(crate::find_bin("wowdps-gui")).spawn();
+}
+
+/// Every other process run from this binary's folder first — a window or
+/// TUI left running would reconnect and start a daemon again — then this
+/// daemon, as `wowdps stop` asks it.
+fn quit() {
+    use std::os::windows::process::CommandExt as _;
+    if let Some(dir) = std::env::current_exe()
+        .ok()
+        .and_then(|e| e.parent().map(|d| d.display().to_string()))
+    {
+        let script = format!(
+            "$d = '{}\\'; Get-Process | Where-Object {{ $_.Id -ne {} -and $_.Path -and \
+             $_.Path.StartsWith($d, [StringComparison]::OrdinalIgnoreCase) }} | Stop-Process -Force",
+            dir.replace('\'', "''"),
+            std::process::id()
+        );
+        let _ = std::process::Command::new("powershell")
+            .args(["-NoProfile", "-NonInteractive", "-Command", &script])
+            .creation_flags(CREATE_NO_WINDOW)
+            .status();
+    }
+    crate::ask_stop();
+}
+
+fn icon_data(hwnd: Hwnd, icon: isize) -> NotifyIconDataW {
+    let mut tip = [0u16; 128];
+    for (slot, c) in tip.iter_mut().zip("wowdps".encode_utf16()) {
+        *slot = c;
+    }
+    NotifyIconDataW {
+        size: std::mem::size_of::<NotifyIconDataW>() as u32,
+        hwnd,
+        id: 1,
+        flags: NIF_MESSAGE | NIF_ICON | NIF_TIP,
+        callback_message: WM_TRAY,
+        icon,
+        tip,
+        state: 0,
+        state_mask: 0,
+        info: [0; 256],
+        version: 0,
+        info_title: [0; 64],
+        info_flags: 0,
+        guid: [0; 16],
+        balloon_icon: 0,
+    }
+}
+
+fn wide(s: &str) -> Vec<u16> {
+    s.encode_utf16().chain(std::iter::once(0)).collect()
+}
+
+const SIDE: i32 = 32;
+
+/// The icon, drawn: three rising gold bars on a dark rounded tile, 32 px
+/// BGRA rows top-down (the alpha carries the corners).
+fn icon_pixels() -> Vec<u8> {
+    const RADIUS: i32 = 6;
+    // Each bar's columns and top row; all stand on row 26.
+    const BARS: [(i32, i32, i32); 3] = [(7, 11, 17), (14, 18, 12), (21, 25, 7)];
+    let corner = |v: i32| v.clamp(RADIUS, SIDE - RADIUS - 1);
+    (0..SIDE)
+        .flat_map(|y| (0..SIDE).map(move |x| (x, y)))
+        .flat_map(|(x, y)| {
+            let (dx, dy) = (x - corner(x), y - corner(y));
+            let inside = dx * dx + dy * dy <= RADIUS * RADIUS;
+            let bar = BARS
+                .iter()
+                .any(|&(x0, x1, top)| (x0..x1).contains(&x) && (top..26).contains(&y));
+            match (inside, bar) {
+                (false, _) => [0, 0, 0, 0],
+                (true, true) => [0x4a, 0xb8, 0xe8, 0xff],
+                (true, false) => [0x30, 0x22, 0x1e, 0xff],
+            }
+        })
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_icon_is_a_square_of_bgra_pixels_with_clear_corners() {
+        let px = icon_pixels();
+        assert_eq!(px.len(), (SIDE * SIDE * 4) as usize);
+        assert_eq!(&px[..4], &[0, 0, 0, 0], "top-left corner is clear");
+        let at = |x: i32, y: i32| {
+            let i = ((y * SIDE + x) * 4) as usize;
+            px[i..i + 4].to_vec()
+        };
+        assert_eq!(at(16, 2), vec![0x30, 0x22, 0x1e, 0xff], "tile");
+        assert_eq!(at(22, 20), vec![0x4a, 0xb8, 0xe8, 0xff], "tallest bar");
+    }
+
+    #[test]
+    fn the_struct_is_the_size_windows_expects() {
+        // NOTIFYICONDATAW on 64-bit Windows.
+        assert_eq!(std::mem::size_of::<NotifyIconDataW>(), 976);
+    }
+}

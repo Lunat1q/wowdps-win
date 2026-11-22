@@ -5,6 +5,8 @@
 //! declares a cursor, and turns snapshots into frames.
 
 mod keys;
+#[cfg(windows)]
+mod tray;
 mod ui;
 
 use std::io::{self, Write as _};
@@ -161,7 +163,13 @@ fn run_daemon(source: Option<SourceSpec>, linger: bool) -> i32 {
     if let Some(note) = unnamed_forever_characters(&cfg.history_characters, &opts) {
         daemon_log(&note);
     }
-    match wowdps_daemon::run(opts) {
+    // Windows: the tray icon to open the meter or quit everything from.
+    #[cfg(windows)]
+    tray::spawn();
+    let ran = wowdps_daemon::run(opts);
+    #[cfg(windows)]
+    tray::remove();
+    match ran {
         Ok(()) => {
             daemon_log("clean exit");
             0
@@ -239,14 +247,22 @@ fn daemon_log(msg: &str) {
 /// `--stop`: exit 0 even if nothing was running — the goal state is "no
 /// daemon", and that is the state.
 fn do_stop() -> i32 {
+    match ask_stop() {
+        true => println!("wowdps: daemon asked to stop"),
+        false => println!("wowdps: no daemon running"),
+    }
+    0
+}
+
+/// Ask the running daemon to shut down; `false` when none answers.
+fn ask_stop() -> bool {
     match sock::connect(wowdps_proto::socket_path()) {
         Ok(mut stream) => {
             let _ = stream.write_all(&ClientMsg::Shutdown.encode());
-            println!("wowdps: daemon asked to stop");
+            true
         }
-        Err(_) => println!("wowdps: no daemon running"),
+        Err(_) => false,
     }
-    0
 }
 
 fn do_status() -> i32 {
