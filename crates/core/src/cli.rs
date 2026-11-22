@@ -123,11 +123,17 @@ pub fn discover_wow_installs(home: &Path) -> Vec<PathBuf> {
     for root in [PathBuf::from("/Applications"), home.join("Applications")] {
         consider(root.join("World of Warcraft"), &mut found);
     }
-    // Battle.net's default install folders.
+    // Battle.net's default install folders, then wherever its uninstall
+    // entry says the game went (any drive).
     #[cfg(windows)]
-    for var in ["ProgramFiles(x86)", "ProgramFiles"] {
-        if let Some(root) = std::env::var_os(var) {
-            consider(PathBuf::from(root).join("World of Warcraft"), &mut found);
+    {
+        for var in ["ProgramFiles(x86)", "ProgramFiles"] {
+            if let Some(root) = std::env::var_os(var) {
+                consider(PathBuf::from(root).join("World of Warcraft"), &mut found);
+            }
+        }
+        if let Some(dir) = registry_install() {
+            consider(dir, &mut found);
         }
     }
     #[cfg(windows)]
@@ -153,6 +159,39 @@ pub fn discover_wow_installs(home: &Path) -> Vec<PathBuf> {
         }
     }
     found
+}
+
+/// The install folder Battle.net records in the game's uninstall entry,
+/// read through `reg.exe` (no registry API in std).
+#[cfg(windows)]
+fn registry_install() -> Option<PathBuf> {
+    use std::os::windows::process::CommandExt as _;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    let out = std::process::Command::new("reg")
+        .args([
+            "query",
+            r"HKLM\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\World of Warcraft",
+            "/v",
+            "InstallLocation",
+        ])
+        .creation_flags(CREATE_NO_WINDOW)
+        .output()
+        .ok()?;
+    reg_sz(&String::from_utf8_lossy(&out.stdout), "InstallLocation").map(PathBuf::from)
+}
+
+/// `name`'s value in `reg query` output (`    name    REG_SZ    value`).
+#[cfg(any(windows, test))]
+fn reg_sz(out: &str, name: &str) -> Option<String> {
+    out.lines().find_map(|line| {
+        let value = line
+            .trim_start()
+            .strip_prefix(name)?
+            .trim_start()
+            .strip_prefix("REG_SZ")?
+            .trim();
+        (!value.is_empty()).then(|| value.to_string())
+    })
 }
 
 /// Of several installs, the one whose `.build.info` changed last — the
@@ -702,6 +741,21 @@ mod tests {
                 source: Some(SourceSpec::File(PathBuf::from("b"))),
                 edition: None
             }
+        );
+    }
+
+    #[test]
+    fn reg_sz_reads_a_value_with_spaces() {
+        let out = "\r\nHKEY_LOCAL_MACHINE\\SOFTWARE\\X\\World of Warcraft\r\n    \
+                   InstallLocation    REG_SZ    G:\\World of Warcraft\r\n\r\n";
+        assert_eq!(
+            reg_sz(out, "InstallLocation").as_deref(),
+            Some("G:\\World of Warcraft")
+        );
+        assert_eq!(reg_sz(out, "DisplayName"), None);
+        assert_eq!(
+            reg_sz("    InstallLocation    REG_SZ    \r\n", "InstallLocation"),
+            None
         );
     }
 
