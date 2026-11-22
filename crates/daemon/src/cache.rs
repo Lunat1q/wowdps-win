@@ -77,13 +77,11 @@ impl IndexCache {
         Self { dir }
     }
 
-    /// The production location: `$XDG_CACHE_HOME/wowdps/index`.
+    /// The production location: `$XDG_CACHE_HOME/wowdps/index`
+    /// (`wowdps_proto::dirs::app_dir`: `cache\index` beside the exes on
+    /// Windows).
     pub fn default_dir() -> Option<PathBuf> {
-        let base = std::env::var_os("XDG_CACHE_HOME")
-            .filter(|v| !v.is_empty())
-            .map(PathBuf::from)
-            .or_else(|| wowdps_proto::dirs::home().map(|h| PathBuf::from(h).join(".cache")))?;
-        Some(base.join("wowdps/index"))
+        wowdps_proto::dirs::app_dir(wowdps_proto::dirs::Base::Cache).map(|d| d.join("index"))
     }
 
     /// Scan `file`, resuming from a cached checkpoint when the file's
@@ -738,17 +736,31 @@ mod tests {
         assert_eq!(warm.checkpoint.offset, cold.checkpoint.offset);
     }
 
-    /// The production location follows `$XDG_CACHE_HOME`, then `$HOME`.
+    /// The production location follows `$XDG_CACHE_HOME`, then `$HOME`
+    /// (Windows: the portable `cache` folder beside the binary).
     #[test]
     fn the_default_dir_follows_the_xdg_environment() {
+        let named = if cfg!(windows) {
+            "C:/xdg-cache"
+        } else {
+            "/xdg-cache"
+        };
         // Env is process-global; this is the only test touching it.
-        unsafe { std::env::set_var("XDG_CACHE_HOME", "/xdg-cache") };
+        unsafe { std::env::set_var("XDG_CACHE_HOME", named) };
         assert_eq!(
             IndexCache::default_dir(),
-            Some(PathBuf::from("/xdg-cache/wowdps/index"))
+            Some(PathBuf::from(named).join("wowdps").join("index"))
         );
         unsafe { std::env::set_var("XDG_CACHE_HOME", "") };
         let fallback = IndexCache::default_dir();
+        #[cfg(windows)]
+        assert_eq!(
+            fallback,
+            std::env::current_exe()
+                .ok()
+                .and_then(|e| e.parent().map(|d| d.join("cache").join("index")))
+        );
+        #[cfg(not(windows))]
         match wowdps_proto::dirs::home() {
             Some(home) => assert_eq!(
                 fallback,

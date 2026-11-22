@@ -215,11 +215,7 @@ fn unnamed_forever_characters(characters: &[String], opts: &DaemonOptions) -> Op
 /// Append one line to `$XDG_STATE_HOME/wowdps/daemon.log` — the only trace a
 /// null-stdio daemon leaves.
 fn daemon_log(msg: &str) {
-    let base = std::env::var_os("XDG_STATE_HOME")
-        .filter(|v| !v.is_empty())
-        .map(PathBuf::from)
-        .or_else(|| wowdps_proto::dirs::home().map(|h| PathBuf::from(h).join(".local/state")));
-    let Some(dir) = base.map(|b| b.join("wowdps")) else {
+    let Some(dir) = wowdps_proto::dirs::app_dir(wowdps_proto::dirs::Base::State) else {
         return;
     };
     if std::fs::create_dir_all(&dir).is_err() {

@@ -683,7 +683,7 @@ Transport: unix socket `$XDG_RUNTIME_DIR/wowdps/wowdps-v<PROTO_VERSION>.sock`
 in the socket *name*: version skew is structurally impossible — a new client
 spawns its own daemon and the old one idle-exits. Windows (std has no unix
 sockets there): loopback TCP on a port the OS picks; the socket path (fallback
-dir `%LOCALAPPDATA%\wowdps\run`) is a file holding `<port> <token>`, the token
+dir `state\run` beside the binaries, `proto::dirs::app_dir`) is a file holding `<port> <token>`, the token
 32 hex digits, which a client sends before its first frame and without which
 the daemon drops the connection (`proto::sock`). Frames are the same bytes.
 

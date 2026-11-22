@@ -62,10 +62,11 @@ fn the_source_comes_from_the_override_the_config_or_nowhere() {
     let root = sandbox();
 
     // Nothing configured, nothing installed: a clear error, no made-up
-    // path. Off macOS only: discovery also scans /Applications, which a
-    // machine with the game installed fills (as core's cli tests note),
-    // making the error path unreachable there.
-    #[cfg(not(target_os = "macos"))]
+    // path. Off macOS and Windows only: discovery also scans /Applications
+    // there, and the registry's install entry here, which a machine with
+    // the game installed fills (as core's cli tests note), making the
+    // error path unreachable.
+    #[cfg(not(any(target_os = "macos", windows)))]
     {
         let cfg = Config::default();
         let err = DaemonOptions::production(&cfg, None, false)

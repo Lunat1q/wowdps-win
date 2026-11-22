@@ -78,12 +78,15 @@ On Windows, build with the MSVC toolchain (Visual Studio Build Tools; the
 history reader compiles its bundled DuckDB with it). There:
 
 - The daemon listens on loopback TCP, not a unix socket. The socket path
-  (`%LOCALAPPDATA%\wowdps\run\wowdps-v<N>.sock`) is a file holding the port
-  and a random token, and a client must send the token first.
-- `~` is `%USERPROFILE%`: config, caches and the history store sit under
-  `~\.config`, `~\.cache` and `~\.local\share`, as they do on Linux.
+  (`state\run\wowdps-v<N>.sock`) is a file holding the port and a random
+  token, and a client must send the token first.
+- The install is portable: config, caches, the history store and the
+  daemon's log sit in `config`, `cache`, `data` and `state` beside the
+  binaries, nothing in the user's profile. An `XDG_*` variable still names
+  its folder instead.
 - Install discovery checks `World of Warcraft` under `%ProgramFiles(x86)%`
-  and `%ProgramFiles%`. Anywhere else, set `logs_dir` or `WOWDPS_WOW_DIR`.
+  and `%ProgramFiles%`, then where Battle.net's uninstall entry says the
+  game went. Anywhere else, set `logs_dir` or `WOWDPS_WOW_DIR`.
 - The game watcher finds `Wow.exe` by its process name only, not its path,
   so it cannot tell editions apart. The overlay still shows while the game
   runs, and the live edition goes by which log was written last.

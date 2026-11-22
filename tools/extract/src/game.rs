@@ -67,8 +67,7 @@ pub fn locate() -> Result<PathBuf, String> {
 /// matching the daemon's section-aware toml-subset reader; the config home
 /// through `wowdps_proto::dirs`).
 fn config_logs_dir() -> Option<PathBuf> {
-    let config_home = wowdps_proto::dirs::config_home()?;
-    let text = std::fs::read_to_string(config_home.join("wowdps").join("config.toml")).ok()?;
+    let text = std::fs::read_to_string(wowdps_proto::dirs::config_file()).ok()?;
     logs_dir_from_config(&text).map(PathBuf::from)
 }
 

@@ -84,8 +84,8 @@ impl Manifest {
 /// The cache: `$XDG_CACHE_HOME/wowdps/db2`, else `~/.cache/wowdps/db2`
 /// (`wowdps_proto::dirs`).
 pub fn cache_root() -> Result<PathBuf, String> {
-    wowdps_proto::dirs::cache_home()
-        .map(|d| d.join("wowdps").join("db2"))
+    wowdps_proto::dirs::app_dir(wowdps_proto::dirs::Base::Cache)
+        .map(|d| d.join("db2"))
         .ok_or_else(|| "no XDG_CACHE_HOME or HOME".to_string())
 }
 

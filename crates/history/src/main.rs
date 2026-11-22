@@ -547,11 +547,7 @@ fn regrade(
 /// the same tolerance as the daemon's subset parser: the last `key = value`
 /// line wins, quoted or bare, `#` comments and section headers skipped.
 fn configured_history_dir() -> Option<PathBuf> {
-    let base = std::env::var_os("XDG_CONFIG_HOME")
-        .filter(|v| !v.is_empty())
-        .map(PathBuf::from)
-        .or_else(|| wowdps_proto::dirs::home().map(|h| PathBuf::from(h).join(".config")))?;
-    let text = std::fs::read_to_string(base.join("wowdps/config.toml")).ok()?;
+    let text = std::fs::read_to_string(wowdps_proto::dirs::config_file()).ok()?;
     let mut found = None;
     for line in text.lines() {
         let line = line.trim();

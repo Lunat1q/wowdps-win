@@ -105,12 +105,7 @@ impl Default for Config {
 
 impl Config {
     pub fn path() -> PathBuf {
-        let base = std::env::var_os("XDG_CONFIG_HOME")
-            .filter(|v| !v.is_empty())
-            .map(PathBuf::from)
-            .or_else(|| wowdps_proto::dirs::home().map(|h| PathBuf::from(h).join(".config")))
-            .unwrap_or_default();
-        base.join("wowdps/config.toml")
+        wowdps_proto::dirs::config_file()
     }
 
     pub fn load() -> Self {
@@ -497,6 +492,15 @@ logs_dir = "/ok"   # with a trailing comment
         assert_eq!(cfg.overlay_exit_grace_secs, 7);
 
         unsafe { std::env::set_var("XDG_CONFIG_HOME", "") };
+        // Windows: the portable `config` folder beside the binary.
+        #[cfg(windows)]
+        assert_eq!(
+            Some(Config::path()),
+            std::env::current_exe()
+                .ok()
+                .and_then(|e| e.parent().map(|d| d.join("config").join("config.toml")))
+        );
+        #[cfg(not(windows))]
         match wowdps_proto::dirs::home() {
             Some(home) => assert_eq!(
                 Config::path(),

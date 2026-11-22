@@ -68,6 +68,17 @@ impl Base {
             .or_else(|| set(home).map(|h| h.join(self.fallback())))
     }
 
+    /// Its folder in a portable install ([`app_dir`] on Windows), beside
+    /// the binaries.
+    pub const fn portable(self) -> &'static str {
+        match self {
+            Base::Data => "data",
+            Base::Cache => "cache",
+            Base::State => "state",
+            Base::Config => "config",
+        }
+    }
+
     /// The directory, as this process's environment says.
     pub fn dir(self) -> Option<PathBuf> {
         let var = std::env::var_os(self.var());
@@ -86,6 +97,25 @@ pub fn home() -> Option<std::ffi::OsString> {
     } else {
         home
     }
+}
+
+/// wowdps's own folder of `base`, where every file of that kind it keeps
+/// lives: `<base dir>/wowdps` as XDG says. On Windows a portable install:
+/// `<the binary's folder>/<Base::portable>` (`config`, `data`, `cache`,
+/// `state` beside the exes, nothing in the user's profile), unless the
+/// base's variable names a folder, as tests and a deliberate setup do.
+pub fn app_dir(base: Base) -> Option<PathBuf> {
+    #[cfg(windows)]
+    {
+        let named = std::env::var_os(base.var())
+            .filter(|v| !v.is_empty())
+            .is_some_and(|v| Path::new(&v).is_absolute());
+        if !named {
+            let exe = std::env::current_exe().ok()?;
+            return exe.parent().map(|d| d.join(base.portable()));
+        }
+    }
+    base.dir().map(|d| d.join("wowdps"))
 }
 
 /// `$XDG_DATA_HOME`, else `~/.local/share`.
@@ -112,7 +142,15 @@ pub fn config_home() -> Option<PathBuf> {
 /// generators write (`talents.json`, `class-icons.bin`, `floors/`,
 /// `portraits/` …) and the design shots beside them.
 pub fn data_path(rel: impl AsRef<Path>) -> Option<PathBuf> {
-    data_home().map(|d| d.join("wowdps").join(rel))
+    app_dir(Base::Data).map(|d| d.join(rel))
+}
+
+/// `config.toml` in wowdps's config folder ([`app_dir`]); with no folder
+/// to be found, the relative `wowdps/config.toml`.
+pub fn config_file() -> PathBuf {
+    app_dir(Base::Config)
+        .unwrap_or_else(|| PathBuf::from("wowdps"))
+        .join("config.toml")
 }
 
 /// Where `edition`'s copy of a per-machine file lives, given where Retail's

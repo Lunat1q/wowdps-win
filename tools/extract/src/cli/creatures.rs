@@ -40,9 +40,9 @@ fn seed_creatures(mut a: Args) -> Result<(), String> {
     let out = out.unwrap_or_else(|| store.join(creatures::FILE));
     let cache = match cache {
         Some(c) => c,
-        None => wowdps_proto::dirs::cache_home()
+        None => wowdps_proto::dirs::app_dir(wowdps_proto::dirs::Base::Cache)
             .ok_or("no XDG_CACHE_HOME or HOME")?
-            .join("wowdps/wowhead"),
+            .join("wowhead"),
     };
     // The file this run lays its seed under, read first: one in a format
     // this build cannot read whole is never rewritten.

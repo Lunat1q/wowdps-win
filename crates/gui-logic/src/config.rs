@@ -289,14 +289,7 @@ impl Config {
         if let Some(path) = TEST_PATH.with(|p| p.borrow().clone()) {
             return path;
         }
-        let base = std::env::var_os("XDG_CONFIG_HOME")
-            .map(PathBuf::from)
-            .filter(|p| p.is_absolute())
-            .unwrap_or_else(|| {
-                let home = wowdps_proto::dirs::home().unwrap_or_default();
-                PathBuf::from(home).join(".config")
-            });
-        base.join("wowdps").join("config.toml")
+        wowdps_proto::dirs::config_file()
     }
 
     /// The daemon's `history_characters` — the names ("Name-Realm", a bare

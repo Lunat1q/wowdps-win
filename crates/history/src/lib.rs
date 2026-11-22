@@ -138,11 +138,7 @@ pub fn edition_filter(edition: Edition) -> String {
 /// Where the lake lives: `$XDG_DATA_HOME/wowdps/history/v1`, else
 /// `~/.local/share/wowdps/history/v1` — the daemon's default too.
 pub fn default_dir() -> Option<PathBuf> {
-    let base = std::env::var_os("XDG_DATA_HOME")
-        .filter(|v| !v.is_empty())
-        .map(PathBuf::from)
-        .or_else(|| wowdps_proto::dirs::home().map(|h| PathBuf::from(h).join(".local/share")))?;
-    Some(base.join("wowdps/history/v1"))
+    wowdps_proto::dirs::data_path("history/v1")
 }
 
 /// A query's answer: column names and rows of JSON values.

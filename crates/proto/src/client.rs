@@ -36,10 +36,8 @@ fn fallback_socket_dir() -> PathBuf {
 
 #[cfg(windows)]
 fn fallback_socket_dir() -> PathBuf {
-    std::env::var_os("LOCALAPPDATA")
-        .map(PathBuf::from)
-        .unwrap_or_else(std::env::temp_dir)
-        .join("wowdps")
+    crate::dirs::app_dir(crate::dirs::Base::State)
+        .unwrap_or_else(|| std::env::temp_dir().join("wowdps"))
         .join("run")
 }
 
@@ -48,8 +46,8 @@ pub fn socket_path() -> PathBuf {
     socket_dir().join(format!("wowdps-v{PROTO_VERSION}.sock"))
 }
 
-/// Create the socket dir (Windows: under the user's own app data, which
-/// its ACL already keeps private).
+/// Create the socket dir (Windows: beside the exes, as private as the
+/// install's folder; the token file in it keeps other clients out).
 #[cfg(windows)]
 pub fn prepare_socket_dir() -> io::Result<PathBuf> {
     let dir = socket_dir();
