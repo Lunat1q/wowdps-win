@@ -267,7 +267,7 @@ pub fn open<V: Render>(
     size: Size<Pixels>,
     build: impl FnOnce(&mut Window, &mut App) -> Entity<V>,
 ) -> (AnyWindowHandle, Entity<V>) {
-    cx.update(gpui_kit::init);
+    cx.update(crate::init);
     cx.update(|cx| gpui_kit::open_window(options(size), cx, build))
         .expect("a test window opens")
 }
@@ -288,7 +288,7 @@ pub fn headless() -> HeadlessAppContext {
         Arc::new(gpui_kit::assets::Assets),
         gpui_kit::platform::current_headless_renderer,
     );
-    cx.update(gpui_kit::init);
+    cx.update(crate::init);
     cx
 }
 

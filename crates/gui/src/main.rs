@@ -153,7 +153,7 @@ fn main() -> ExitCode {
     let failure = Rc::new(RefCell::new(None::<String>));
     let failed = Rc::clone(&failure);
     gpui_kit::application().run(move |cx| {
-        gpui_kit::init(cx);
+        init(cx);
         keys::bind(cx);
         fonts(cx);
         theme::Themes::set(themes, cx);
@@ -175,6 +175,14 @@ fn main() -> ExitCode {
         }
         None => ExitCode::SUCCESS,
     }
+}
+
+/// Initialize Kit for both the meter window and the overlay.
+fn init(cx: &mut gpui_kit::App) {
+    // The GUI is laid out left to right, fixed, for now. Set this before
+    // Kit initializes so its system-locale default cannot reverse inputs.
+    gpui_kit::base::LayoutDirection::Ltr.set_global(cx);
+    gpui_kit::init(cx);
 }
 
 /// The bundled faces, registered before the first window opens. A face that
@@ -227,4 +235,58 @@ fn print_theme(name: Option<String>) -> ExitCode {
     );
     print!("{}", wowdps_gui_logic::theme::theme_toml(def, &def.name));
     ExitCode::SUCCESS
+}
+
+#[cfg(test)]
+mod tests {
+    use gpui_kit::base::LayoutDirection;
+    use gpui_kit::component::input::InputState;
+    use gpui_kit::prelude::*;
+    use gpui_kit::test::TestWindowExt as _;
+    use gpui_kit::{Entity, TestAppContext, Window, px, size};
+
+    struct Query(Entity<InputState>);
+
+    impl Render for Query {
+        fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            crate::window::field::Field::new(
+                "query",
+                &self.0,
+                &crate::window::w::W::new(1.0, 300.0, cx),
+            )
+        }
+    }
+
+    #[gpui_kit::test]
+    fn initialization_keeps_ascii_query_arrows_ltr_after_rtl(cx: &mut TestAppContext) {
+        // Kit otherwise picks LTR under the test scheduler, even with an
+        // RTL shell locale. Seed the global to exercise that startup state.
+        cx.update(|cx| LayoutDirection::Rtl.set_global(cx));
+        // This calls the same initializer as both production surfaces.
+        let (window, query) = crate::testkit::open(cx, size(px(300.), px(100.)), |window, cx| {
+            assert_eq!(LayoutDirection::global(cx), LayoutDirection::Ltr);
+            let input = cx.new(|cx| InputState::new(window, cx));
+            input.update(cx, |s, cx| s.focus(window, cx));
+            cx.new(|_| Query(input))
+        });
+        cx.update_window(window, |_, window, cx| {
+            window.render_frame(cx);
+            window.input("abc", cx);
+            let input = query.read(cx).0.clone();
+            assert_eq!(input.read(cx).cursor(), 3, "abc|");
+            for (key, cursor) in [
+                ("left", 2),
+                ("left", 1),
+                ("right", 2),
+                ("right", 3),
+                ("right", 3),
+                ("left", 2),
+            ] {
+                window.press(key, cx);
+                assert_eq!(input.read(cx).cursor(), cursor, "after {key}");
+                assert_eq!(input.read(cx).value().as_ref(), "abc");
+            }
+        })
+        .expect("the query window");
+    }
 }
