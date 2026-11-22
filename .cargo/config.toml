@@ -1,0 +1,5 @@
+# Windows: link the C runtime statically, so the shipped .exe files start on
+# a PC without the Visual C++ Redistributable. cc-rs builds the history
+# reader's bundled DuckDB to match (/MT).
+[target.'cfg(all(windows, target_env = "msvc"))']
+rustflags = ["-C", "target-feature=+crt-static"]
