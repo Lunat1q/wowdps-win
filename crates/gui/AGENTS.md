@@ -19,8 +19,10 @@ Read before the work it covers:
   Hyprland IPC, keys, models, words, geometry) belongs to
   `crates/gui-logic`, with its tests. The GUI brings a text measure and its
   paint.
-- **Stock GPUI only.** `gpui-kit` is pinned exactly (`=0.9.1`) with its
-  default features and no `tree-sitter*`; no `[patch]`, no fork. Design
+- **Published GPUI Kit only.** `gpui-kit` is pinned exactly (`=0.10.0`).
+  wowdps uses its default backend and features, with no `tree-sitter*`.
+  Dependents may select Kit's published `gpui-fast` backend through its
+  feature; no application `[patch]` or fork is permitted. Design
   around a missing capability or contribute it upstream. A GPUI or Kit bump
   is its own change. Our code names no transitive crate except serde/toml
   and `image` (only to build `RenderImage` frames).

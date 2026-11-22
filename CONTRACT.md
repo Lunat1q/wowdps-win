@@ -1633,16 +1633,18 @@ the history store's record codec, one JSON document per file, shared by the
 daemon that writes and every reader that parses). tui: ratatui + crossterm.
 gui (the GUI on GPUI, signed off 2026-09-30, the GUI spec's §4; it
 replaced the iced GUI at the cutover, spec §10): `gpui-kit` pinned exactly
-(`=`), with its default features (`component`, `assets`) and no
-`tree-sitter*` feature — the
+(`=0.10.0`), with its default backend and features (`component`, `assets`)
+and no `tree-sitter*` feature. Dependents may select Kit's published
+`gpui-fast` backend through its feature; wowdps does not enable it. The
 `gpui-pre` family, `gpui-base`, `gpui-component` and `gpui-kit-assets` it pins
 are accepted as ONE unit, including what they pull transitively (serde /
 serde_json, smol, futures, chrono, regex, image, wgpu, cosmic-text, taffy,
 rust-i18n, resvg, notify, uuid …), none of which our own code may name except
 serde/toml and `image`; plus serde/toml, and `image` (`default-features =
 false`, the version `gpui-pre-wgpu` locks) named only to build GPUI
-`RenderImage` frames. No `[patch]` of any `gpui-pre*` or Kit crate and no fork
-of GPUI: a capability GPUI lacks is designed around or contributed upstream.
+`RenderImage` frames. No application `[patch]` of any GPUI or Kit crate and
+no application fork of GPUI: a capability GPUI lacks is designed around or
+contributed upstream.
 gui-logic (the framework-free GUI logic the gui draws from): model + proto +
 serde/toml. The replay (`wowdps-replay`, with the encounter rubric, the
 replay's extractor and `wowdps-gui-shared`) and the editors live in their own

@@ -9,10 +9,11 @@ compositor and no daemon runs, so nothing is launched beside a running
 game. They are debug-profile runs.
 
 What they need: a **wgpu adapter** (`current_headless_renderer()` is
-`WgpuHeadlessRenderer` on Linux: a GPU, or Mesa's lavapipe). CI and the nix
-sandbox have none, so none of these runs there; every ordinary `cargo test`
-still runs the interaction tests (Kit's `TestWindowExt`) and the real-text
-layout tests, which need no GPU.
+`WgpuHeadlessRenderer` on Linux: a GPU, or Mesa's lavapipe). CI supplies
+lavapipe for the real-text layout tests, but picture tests remain ignored
+and run only when requested explicitly. Every ordinary `cargo test` still
+runs the interaction tests (Kit's `TestWindowExt`) and the real-text layout
+tests; neither needs a hardware GPU.
 
 Every picture is taken with motion reduced (`cx.set_reduce_motion(true)`):
 each delight settles at once, so a shot is the settled pixels, never a
