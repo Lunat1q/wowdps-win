@@ -17,6 +17,7 @@ pub const ART: &[&str] = &[
     "spell-icons.bin",
     "spell-tips.bin",
     "talent-art.bin",
+    "talents.json",
 ];
 
 /// The extractor to run `setup` with before the window opens: the sibling

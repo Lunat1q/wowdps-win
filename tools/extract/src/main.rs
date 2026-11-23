@@ -42,13 +42,14 @@ fn tables(a: Args) -> Result<(), String> {
     EXTRACT.tables(a)
 }
 
-/// The art caches `setup` makes, in order, each its command on its
+/// The caches `setup` makes, in order, each its command on its
 /// defaults: the install found as every command finds it, the cache
 /// written in the data home.
 const ART: &[&str] = &[
     "gen-icons",
     "gen-spell-icons",
     "gen-spell-tips",
+    "gen-talent-trees",
     "gen-talent-art",
     "gen-emblems",
 ];
