@@ -868,13 +868,16 @@ fn player(cx: &Ctx, rows: &[Row], me: Option<usize>) -> Insp {
     let owner = me.is_some() && cx.owner == me;
     let mut sub: Vec<String> = plays(class, spec).into_iter().collect();
     if owner {
-        sub.push("you".to_string());
+        sub.push(crate::theme::tr("you").to_string());
     }
     if let Some(first) = deaths.first() {
         sub.push(match deaths.len() {
             1 => format!("died {}", mmss(first.at_ms.max(0) as u32)),
             n => format!("died {n} times, first {}", mmss(first.at_ms.max(0) as u32)),
         });
+        if let Some(last) = sub.last_mut() {
+            *last = crate::theme::tr(last.clone()).to_string();
+        }
     }
     let head = Head {
         discs: vec![Disc::Player(class, spec)],

@@ -154,8 +154,10 @@ impl TalentViewer {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
-        let input =
-            cx.new(|cx| InputState::new(window, cx).placeholder("paste an in-game talent string…"));
+        let input = cx.new(|cx| {
+            InputState::new(window, cx)
+                .placeholder(crate::theme::tr("paste an in-game talent string…"))
+        });
         let typed = cx.subscribe_in(&input, window, |this, state, event, _, cx| match event {
             InputEvent::Change => {
                 let text = state.read(cx).value().to_string();

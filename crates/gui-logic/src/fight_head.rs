@@ -452,14 +452,7 @@ fn role_noun(role: Option<Role>, n: usize) -> Option<&'static str> {
 
 /// 1st, 2nd, 3rd, 4th … 11th, 12th, 13th … 21st, 22nd.
 pub fn ordinal(n: usize) -> String {
-    let suffix = match (n % 10, n % 100) {
-        (_, 11..=13) => "th",
-        (1, _) => "st",
-        (2, _) => "nd",
-        (3, _) => "rd",
-        _ => "th",
-    };
-    format!("{n}{suffix}")
+    crate::i18n::ordinal(n)
 }
 
 /// The owner's row among `rows` (our side's, never an enemy's), by the

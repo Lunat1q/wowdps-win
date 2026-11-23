@@ -1072,10 +1072,11 @@ pub fn long_date(day: i64, tonight: i64) -> String {
     let (y, m, d) = rail::civil(day);
     let month = rail::month_name(m, false);
     let weekday = rail::weekday(day);
+    let date = crate::i18n::month_day(month, d, true);
     if y == rail::civil(tonight).0 {
-        format!("{weekday}, {month} {d}")
+        format!("{weekday}, {date}")
     } else {
-        format!("{weekday}, {month} {d}, {y}")
+        format!("{weekday}, {date}, {y}")
     }
 }
 

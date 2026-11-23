@@ -70,8 +70,9 @@ impl Word {
         window: &mut Window,
         cx: &mut App,
     ) {
+        let s = crate::theme::tr(self.s.clone());
         let run = TextRun {
-            len: self.s.len(),
+            len: s.len(),
             font: Font {
                 weight: self.weight,
                 ..font(ui.clone())
@@ -81,12 +82,9 @@ impl Word {
             underline: None,
             strikethrough: None,
         };
-        let line = window.text_system().shape_line(
-            SharedString::from(self.s.clone()),
-            px(self.px * z),
-            &[run],
-            None,
-        );
+        let line = window
+            .text_system()
+            .shape_line(s, px(self.px * z), &[run], None);
         let width = f32::from(line.width);
         let x = self.x * z
             - match self.anchor {

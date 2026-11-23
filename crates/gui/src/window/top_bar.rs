@@ -260,7 +260,11 @@ impl Parts {
                 0.0
             } else {
                 let word = if p.live { "Live" } else { "Latest" };
-                let words = format!("{word}, {}", p.name);
+                let words = format!(
+                    "{}, {}",
+                    crate::theme::tr(word),
+                    crate::theme::tr(p.name.to_string())
+                );
                 text(window, &words, PILL_PX, &w.ui, REGULAR).min(PILL_NAME_W)
             };
             (
@@ -958,7 +962,11 @@ fn live_pill(
                 .font_family(w.ui.clone())
                 .text_size(w.z(PILL_PX))
                 .truncate()
-                .child(format!("{word}, {}", p.name)),
+                .child(format!(
+                    "{}, {}",
+                    crate::theme::tr(word),
+                    crate::theme::tr(p.name.to_string())
+                )),
         );
     }
     if !dot_alone {

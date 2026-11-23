@@ -221,15 +221,20 @@ pub fn month_name(m: u32, short: bool) -> &'static str {
         .get((m as usize).saturating_sub(1))
         .copied()
         .unwrap_or_default();
-    if short {
+    crate::i18n::tr_static(if short {
         name.get(..3).unwrap_or(name)
     } else {
         name
-    }
+    })
 }
 
 /// The weekday of a night: "Saturday".
 pub fn weekday(day: i64) -> &'static str {
+    crate::i18n::tr_static(weekday_en(day))
+}
+
+/// The weekday in English, the table's key.
+fn weekday_en(day: i64) -> &'static str {
     // 1970-01-01 was a Thursday.
     WEEKDAYS
         .get((day + 4).rem_euclid(7) as usize)
@@ -246,10 +251,11 @@ pub fn night_label(day: i64, tonight: i64) -> String {
     let (y, m, d) = civil(day);
     let weekday = weekday(day);
     let month = month_name(m, true);
+    let date = crate::i18n::month_day(month, d, false);
     if y == civil(tonight).0 {
-        format!("{weekday}, {month} {d}")
+        format!("{weekday}, {date}")
     } else {
-        format!("{weekday}, {month} {d}, {y}")
+        format!("{weekday}, {date}, {y}")
     }
 }
 
@@ -257,12 +263,13 @@ pub fn night_label(day: i64, tonight: i64) -> String {
 /// — the year only when it is not tonight's.
 pub fn night_short(day: i64, tonight: i64) -> String {
     let (y, m, d) = civil(day);
-    let weekday = weekday(day).get(..3).unwrap_or_default();
+    let weekday = crate::i18n::tr_static(weekday_en(day).get(..3).unwrap_or_default());
     let month = month_name(m, true);
+    let date = crate::i18n::month_day(month, d, false);
     if y == civil(tonight).0 {
-        format!("{weekday}, {month} {d}")
+        format!("{weekday}, {date}")
     } else {
-        format!("{weekday}, {month} {d}, {y}")
+        format!("{weekday}, {date}, {y}")
     }
 }
 

@@ -54,8 +54,8 @@ impl Tally {
 /// "Demonology Warlock".
 pub fn plays(class: Option<Class>, spec: Option<Spec>) -> Option<String> {
     match (spec, class) {
-        (Some(s), _) => Some(format!("{} {}", s.name(), s.class().name())),
-        (None, Some(c)) => Some(c.name().to_string()),
+        (Some(s), _) => Some(crate::i18n::spec_class(s.name(), s.class().name())),
+        (None, Some(c)) => Some(crate::i18n::tr(c.name()).into_owned()),
         (None, None) => None,
     }
 }
@@ -196,9 +196,12 @@ pub fn energize_line(rows: &[EnergizeRow]) -> Option<String> {
         .iter()
         .filter(|e| e.gained > 0.0 || e.wasted > 0.0)
         .map(|e| {
-            let mut s = format!("{} {} gained", power_label(e.power_type), amount(e.gained));
+            use crate::i18n::tr;
+            let gained = format!("{} gained", amount(e.gained));
+            let mut s = format!("{} {}", tr(&power_label(e.power_type)), tr(&gained));
             if e.wasted > 0.0 {
-                s.push_str(&format!(", {} wasted", amount(e.wasted)));
+                let wasted = format!("{} wasted", amount(e.wasted));
+                s.push_str(&format!(", {}", tr(&wasted)));
             }
             s
         })

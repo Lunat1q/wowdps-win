@@ -8,8 +8,7 @@
 
 use gpui_kit::prelude::*;
 use gpui_kit::{
-    Context, Div, FontWeight, SharedString, TestSupportExt as _, TextRun, Window, div, font,
-    relative,
+    Context, Div, FontWeight, TestSupportExt as _, TextRun, Window, div, font, relative,
 };
 use wowdps_gui_logic::deaths::before;
 use wowdps_gui_logic::inspect::recap::{Recap, change_words, insight};
@@ -59,6 +58,7 @@ struct Cols {
 
 /// `words`' one-line width at `size` in the window's face and `weight`.
 fn text_w(window: &Window, w: &W, words: &str, size: f32, weight: FontWeight) -> f32 {
+    let words = crate::theme::tr(words.to_string());
     let mut f = font(w.ui.clone());
     f.weight = weight;
     let run = TextRun {
@@ -72,12 +72,7 @@ fn text_w(window: &Window, w: &W, words: &str, size: f32, weight: FontWeight) ->
     f32::from(
         window
             .text_system()
-            .shape_line(
-                SharedString::from(words.to_string()),
-                w.z(size),
-                &[run],
-                None,
-            )
+            .shape_line(words, w.z(size), &[run], None)
             .width,
     ) / w.zoom
 }

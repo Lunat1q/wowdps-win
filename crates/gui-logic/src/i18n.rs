@@ -101,6 +101,53 @@ pub fn tr_in(lang: Lang, text: &str) -> Cow<'_, str> {
     Cow::Borrowed(text)
 }
 
+/// A compiled-in word in the current language, still `'static`.
+pub fn tr_static(text: &'static str) -> &'static str {
+    match tr(text) {
+        Cow::Borrowed(b) => b,
+        Cow::Owned(_) => text,
+    }
+}
+
+/// A day of a month as the language writes it: "Nov 22", "22 ноя",
+/// "22 de noviembre", "22. November". `month` is already translated.
+pub fn month_day(month: &str, day: u32, long: bool) -> String {
+    match current() {
+        Lang::En => format!("{month} {day}"),
+        Lang::Ru => format!("{day} {month}"),
+        Lang::Es if long => format!("{day} de {month}"),
+        Lang::Es => format!("{day} {month}"),
+        Lang::De => format!("{day}. {month}"),
+    }
+}
+
+/// "Subtlety Rogue"; elsewhere the class first, its spec after it.
+pub fn spec_class(spec: &str, class: &str) -> String {
+    match current() {
+        Lang::En => format!("{spec} {class}"),
+        _ => format!("{} ({})", tr(class), tr(spec)),
+    }
+}
+
+/// "1st"; "1-й", "1.º", "1.".
+pub fn ordinal(n: usize) -> String {
+    match current() {
+        Lang::En => {
+            let suffix = match (n % 10, n % 100) {
+                (_, 11..=13) => "th",
+                (1, _) => "st",
+                (2, _) => "nd",
+                (3, _) => "rd",
+                _ => "th",
+            };
+            format!("{n}{suffix}")
+        }
+        Lang::Ru => format!("{n}-й"),
+        Lang::Es => format!("{n}.º"),
+        Lang::De => format!("{n}."),
+    }
+}
+
 /// The holes of `template` (its `{}`) as `text` fills them, if it fits.
 fn fit<'t>(template: &str, text: &'t str) -> Option<Vec<&'t str>> {
     let mut parts = template.split("{}");
@@ -410,6 +457,124 @@ const WORDS: &[Entry] = &[
     ("wipe or over time", "вайп или просрочено", "wipe o fuera de tiempo", "Wipe oder überzogen"),
     ("run time against the timer", "время забега против таймера", "tiempo de carrera contra el temporizador", "Laufzeit gegen den Timer"),
     ("played tonight", "сыграно сегодня", "jugado esta noche", "heute Abend gespielt"),
+    // The rail, the bar, the fight head.
+    ("Pulls", "Пуллы", "Pulls", "Pulls"),
+    ("Hide trash", "Скрыть трэш", "Ocultar trash", "Trash ausblenden"),
+    ("Filter players", "Фильтр игроков", "Filtrar jugadores", "Spieler filtern"),
+    ("Jump to a pull, player or view (Ctrl K)", "Перейти к пуллу, игроку или виду (Ctrl K)", "Saltar a un pull, jugador o vista (Ctrl K)", "Zu Pull, Spieler oder Ansicht springen (Ctrl K)"),
+    ("paste an in-game talent string…", "вставьте строку талантов из игры…", "pega una cadena de talentos del juego…", "Talent-String aus dem Spiel einfügen…"),
+    ("Raid dps", "Рейд DPS", "DPS de banda", "Schlachtzug-DPS"),
+    ("Run dps", "DPS забега", "DPS de carrera", "Lauf-DPS"),
+    ("Raid dps, peak {}", "Рейд DPS, пик {}", "DPS de banda, pico {}", "Schlachtzug-DPS, Spitze {}"),
+    ("Run dps, peak {}", "DPS забега, пик {}", "DPS de carrera, pico {}", "Lauf-DPS, Spitze {}"),
+    ("Follower", "Соратники", "Seguidores", "Anhänger"),
+    ("{}, Follower", "{}, соратники", "{}, seguidores", "{}, Anhänger"),
+    ("you", "вы", "tú", "du"),
+    ("alive {}, rezzed by {}", "жив {}, воскресил {}", "vivo {}, resucitado por {}", "lebt {}, wiederbelebt von {}"),
+    ("alive {}, rezzed", "жив {}, воскрешён", "vivo {}, resucitado", "lebt {}, wiederbelebt"),
+    ("{} gained", "{} получено", "{} ganado", "{} gewonnen"),
+    ("{} wasted", "{} потеряно", "{} desperdiciado", "{} verschwendet"),
+    // Resources.
+    ("Energy", "Энергия", "Energía", "Energie"),
+    ("Combo points", "Приёмы серии", "Puntos de combo", "Combopunkte"),
+    ("Mana", "Мана", "Maná", "Mana"),
+    ("Rage", "Ярость", "Ira", "Wut"),
+    ("Focus", "Концентрация", "Enfoque", "Fokus"),
+    ("Runic power", "Сила рун", "Poder rúnico", "Runenmacht"),
+    ("Runes", "Руны", "Runas", "Runen"),
+    ("Soul shards", "Осколки души", "Fragmentos de alma", "Seelensplitter"),
+    ("Holy power", "Энергия Света", "Poder sagrado", "Heilige Kraft"),
+    ("Maelstrom", "Энергия Водоворота", "Vorágine", "Mahlstrom"),
+    ("Chi", "Ци", "Chi", "Chi"),
+    ("Insanity", "Безумие", "Locura", "Wahnsinn"),
+    ("Fury", "Неистовство", "Furia", "Furor"),
+    ("Pain", "Боль", "Dolor", "Schmerz"),
+    ("Essence", "Сущность", "Esencia", "Essenz"),
+    ("Astral power", "Астральная сила", "Poder astral", "Astrale Macht"),
+    ("Lunar power", "Астральная сила", "Poder astral", "Astrale Macht"),
+    ("Arcane charges", "Заряды тайной магии", "Cargas arcanas", "Arkanladungen"),
+    // Classes and specs (the game's own names).
+    ("Warrior", "Воин", "Guerrero", "Krieger"),
+    ("Paladin", "Паладин", "Paladín", "Paladin"),
+    ("Hunter", "Охотник", "Cazador", "Jäger"),
+    ("Rogue", "Разбойник", "Pícaro", "Schurke"),
+    ("Priest", "Жрец", "Sacerdote", "Priester"),
+    ("Death Knight", "Рыцарь смерти", "Caballero de la Muerte", "Todesritter"),
+    ("Shaman", "Шаман", "Chamán", "Schamane"),
+    ("Mage", "Маг", "Mago", "Magier"),
+    ("Warlock", "Чернокнижник", "Brujo", "Hexenmeister"),
+    ("Monk", "Монах", "Monje", "Mönch"),
+    ("Druid", "Друид", "Druida", "Druide"),
+    ("Demon Hunter", "Охотник на демонов", "Cazador de demonios", "Dämonenjäger"),
+    ("Evoker", "Пробудитель", "Evocador", "Rufer"),
+    ("Arms", "Оружие", "Armas", "Waffen"),
+    ("Protection", "Защита", "Protección", "Schutz"),
+    ("Retribution", "Воздаяние", "Reprensión", "Vergeltung"),
+    ("Beast Mastery", "Повелитель зверей", "Bestias", "Tierherrschaft"),
+    ("Marksmanship", "Стрельба", "Puntería", "Treffsicherheit"),
+    ("Survival", "Выживание", "Supervivencia", "Überleben"),
+    ("Assassination", "Ликвидация", "Asesinato", "Meucheln"),
+    ("Outlaw", "Головорез", "Forajido", "Gesetzlosigkeit"),
+    ("Subtlety", "Скрытность", "Sutileza", "Täuschung"),
+    ("Discipline", "Послушание", "Disciplina", "Disziplin"),
+    ("Blood", "Кровь", "Sangre", "Blut"),
+    ("Unholy", "Нечестивость", "Profano", "Unheilig"),
+    ("Elemental", "Стихии", "Elemental", "Elementar"),
+    ("Enhancement", "Совершенствование", "Mejora", "Verstärkung"),
+    ("Restoration", "Исцеление", "Restauración", "Wiederherstellung"),
+    ("Affliction", "Колдовство", "Aflicción", "Gebrechen"),
+    ("Demonology", "Демонология", "Demonología", "Dämonologie"),
+    ("Destruction", "Разрушение", "Destrucción", "Zerstörung"),
+    ("Brewmaster", "Хмелевар", "Maestro cervecero", "Braumeister"),
+    ("Mistweaver", "Ткач туманов", "Tejedor de niebla", "Nebelwirker"),
+    ("Windwalker", "Танцующий с ветром", "Viajero del viento", "Windläufer"),
+    ("Balance", "Баланс", "Equilibrio", "Gleichgewicht"),
+    ("Feral", "Сила зверя", "Feral", "Wildheit"),
+    ("Guardian", "Страж", "Guardián", "Wächter"),
+    ("Havoc", "Истребление", "Devastación", "Verwüstung"),
+    ("Vengeance", "Месть", "Venganza", "Rachsucht"),
+    ("Devourer", "Пожиратель", "Devorador", "Verschlinger"),
+    ("Devastation", "Опустошение", "Devastación", "Verheerung"),
+    ("Preservation", "Сохранение", "Preservación", "Bewahrung"),
+    ("Augmentation", "Насыщение", "Aumento", "Verstärkung"),
+    // Dates: full months as a date writes them, then their short forms.
+    ("January", "января", "enero", "Januar"),
+    ("February", "февраля", "febrero", "Februar"),
+    ("March", "марта", "marzo", "März"),
+    ("April", "апреля", "abril", "April"),
+    ("May", "мая", "mayo", "Mai"),
+    ("June", "июня", "junio", "Juni"),
+    ("July", "июля", "julio", "Juli"),
+    ("August", "августа", "agosto", "August"),
+    ("September", "сентября", "septiembre", "September"),
+    ("October", "октября", "octubre", "Oktober"),
+    ("November", "ноября", "noviembre", "November"),
+    ("December", "декабря", "diciembre", "Dezember"),
+    ("Jan", "янв", "ene", "Jan."),
+    ("Feb", "фев", "feb", "Feb."),
+    ("Mar", "мар", "mar", "März"),
+    ("Apr", "апр", "abr", "Apr."),
+    ("Jun", "июн", "jun", "Juni"),
+    ("Jul", "июл", "jul", "Juli"),
+    ("Aug", "авг", "ago", "Aug."),
+    ("Sep", "сен", "sept", "Sep."),
+    ("Oct", "окт", "oct", "Okt."),
+    ("Nov", "ноя", "nov", "Nov."),
+    ("Dec", "дек", "dic", "Dez."),
+    ("Monday", "Понедельник", "Lunes", "Montag"),
+    ("Tuesday", "Вторник", "Martes", "Dienstag"),
+    ("Wednesday", "Среда", "Miércoles", "Mittwoch"),
+    ("Thursday", "Четверг", "Jueves", "Donnerstag"),
+    ("Friday", "Пятница", "Viernes", "Freitag"),
+    ("Saturday", "Суббота", "Sábado", "Samstag"),
+    ("Sunday", "Воскресенье", "Domingo", "Sonntag"),
+    ("Mon", "Пн", "Lun", "Mo"),
+    ("Tue", "Вт", "Mar", "Di"),
+    ("Wed", "Ср", "Mié", "Mi"),
+    ("Thu", "Чт", "Jue", "Do"),
+    ("Fri", "Пт", "Vie", "Fr"),
+    ("Sat", "Сб", "Sáb", "Sa"),
+    ("Sun", "Вс", "Dom", "So"),
     // The keys sheet.
     ("What works on {}. Any key or click closes this.", "Что работает в «{}». Любая клавиша или щелчок закроет это.", "Qué funciona en {}. Cualquier tecla o clic cierra esto.", "Was in {} funktioniert. Jede Taste oder jeder Klick schließt das."),
     ("move", "перемещение", "mover", "bewegen"),
@@ -495,6 +660,17 @@ mod tests {
         let len = keys.len();
         keys.dedup();
         assert_eq!(keys.len(), len, "a key appears twice");
+    }
+
+    #[test]
+    fn dates_ordinals_and_specs_follow_the_language() {
+        set(Lang::Ru);
+        assert_eq!(crate::rail::night_short(20_779, 20_779 + 1), "Вс, 22 ноя");
+        assert_eq!(ordinal(1), "1-й");
+        assert_eq!(spec_class("Subtlety", "Rogue"), "Разбойник (Скрытность)");
+        set(Lang::En);
+        assert_eq!(crate::rail::night_short(20_779, 20_779 + 1), "Sun, Nov 22");
+        assert_eq!(ordinal(22), "22nd");
     }
 
     #[test]

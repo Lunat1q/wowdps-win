@@ -133,7 +133,8 @@ impl Gui {
             self.close_palette(window, cx);
             return;
         }
-        let input = cx.new(|cx| InputState::new(window, cx).placeholder(JUMP_WORDS));
+        let input =
+            cx.new(|cx| InputState::new(window, cx).placeholder(crate::theme::tr(JUMP_WORDS)));
         let typed = cx.subscribe_in(
             &input,
             window,

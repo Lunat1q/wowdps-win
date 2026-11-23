@@ -57,6 +57,7 @@ impl Shaper {
 
     /// `s` shaped at `size` (zoom 1) in `face`, as it is painted.
     pub fn line(&self, s: &str, size: f32, face: Face, color: Hsla) -> ShapedLine {
+        let s = crate::theme::tr(s.to_string());
         let run = TextRun {
             len: s.len(),
             font: Font {
@@ -68,12 +69,7 @@ impl Shaper {
             underline: None,
             strikethrough: None,
         };
-        self.text.shape_line(
-            SharedString::from(s.to_string()),
-            self.pen.px(size),
-            &[run],
-            None,
-        )
+        self.text.shape_line(s, self.pen.px(size), &[run], None)
     }
 
     /// `s`'s one-line width at `size` in `face`, at zoom 1.

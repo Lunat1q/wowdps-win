@@ -243,7 +243,8 @@ impl Gui {
         cx: &mut Context<Self>,
     ) -> Self {
         let changes = cx.observe(&session, |this, _, cx| this.on_session(cx));
-        let filter = cx.new(|cx| InputState::new(window, cx).placeholder("Filter players"));
+        let filter = cx
+            .new(|cx| InputState::new(window, cx).placeholder(crate::theme::tr("Filter players")));
         let typed = cx.subscribe_in(&filter, window, |this, state, event, window, cx| {
             match event {
                 InputEvent::Change => {
