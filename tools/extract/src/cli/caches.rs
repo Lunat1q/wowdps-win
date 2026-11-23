@@ -46,7 +46,7 @@ pub const COMMANDS: &[Cmd] = &[
         "gen-talent-trees",
         "gen-talent-trees [wow-dir] --dbd-dir <dir>
                        [-o talents.json] [--keys tactkeys.txt]
-                       [--listfile icons.csv] [--product wow]",
+                       [--listfile icons.csv] [--locale ruRU] [--product wow]",
         talent_trees,
     )
     .reads(&[&talentgen::TABLES]),
@@ -362,16 +362,35 @@ pub fn talent_art(mut a: Args) -> Result<(), String> {
 pub fn talent_trees(mut a: Args) -> Result<(), String> {
     let out = a.path(&["-o", "--out"])?;
     let listfile = a.path(&["--listfile"])?;
+    let locale = a.opt(&["--locale"])?;
     let install = Install::with_tables(&mut a)?;
     a.finish()?;
-    owned_only(&install, out.as_deref(), None, &cache_place(TALENTS))?;
+    // Another locale's trees are a file of their own beside the English
+    // ones (`talents-ruRU.json`), which the GUI reads in that language.
+    let (locale, mask, file) = match locale {
+        Some(l) if !l.eq_ignore_ascii_case("enUS") => {
+            let mask = wowdps_extract::tact::locale_mask(&l)?;
+            let file = format!("talents-{l}.json");
+            (l, mask, file)
+        }
+        _ => ("enUS".to_string(), 0x2, TALENTS.to_string()),
+    };
+    owned_only(&install, out.as_deref(), None, &cache_place(&file))?;
     // A per-machine cache like the icon caches — Blizzard-derived strings
     // (spell names) never land in the repository.
     let out = match out {
         Some(p) => p,
-        None => data_path(TALENTS)?,
+        None => data_path(&file)?,
     };
-    let (game, tables) = install.open_tables()?;
+    let game = install.open()?.with_locale(mask);
+    let mut tables = load_tables(&game, install.dbd_dir()?, &install.tables)?;
+    // The class trees are found by the class skill lines' English names:
+    // that one table is read in English whatever the locale.
+    let game = game.with_locale(0x2);
+    if mask != 0x2 {
+        let skill = super::install::load_table(&game, install.dbd_dir()?, "SkillLine")?;
+        tables.insert("SkillLine", skill);
+    }
     let icon_names = match &listfile {
         Some(p) => icon_listfile(p)?,
         None => {
@@ -383,7 +402,7 @@ pub fn talent_trees(mut a: Args) -> Result<(), String> {
     // The dataset's build names the product beside it for any but
     // Retail's, as the tables' headers do (`Game::build_label`).
     let build = game.build_label();
-    let g = talentgen::generate(&tables, &icon_names, &build)?;
+    let g = talentgen::generate_in(&tables, &icon_names, &build, &locale)?;
     if let Some(parent) = out.parent() {
         make_dir(parent)?;
     }

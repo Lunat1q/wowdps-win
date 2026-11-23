@@ -87,7 +87,8 @@ pub fn load_dataset() -> Result<&'static Json, String> {
 }
 
 /// `edition`'s talent dataset, through the test hooks: the game's own
-/// trees (`wowdps_proto::talents::load_in`), never another's.
+/// trees (`wowdps_proto::talents::load_in`), never another's, in the
+/// window's language when the client's data in it was extracted.
 pub fn load_dataset_in(edition: Edition) -> Result<&'static Json, String> {
     #[cfg(any(test, feature = "test-support"))]
     {
@@ -102,7 +103,13 @@ pub fn load_dataset_in(edition: Edition) -> Result<&'static Json, String> {
             return Ok(ds);
         }
     }
-    wowdps_proto::talents::load_in(edition)
+    // The trees in the window's language where the client's data in it was
+    // extracted (names and descriptions); the English ones otherwise.
+    let localized = crate::i18n::current()
+        .game_locales()
+        .iter()
+        .find_map(|loc| wowdps_proto::talents::load_locale_in(edition, loc));
+    localized.map_or_else(|| wowdps_proto::talents::load_in(edition), Ok)
 }
 
 #[cfg(test)]

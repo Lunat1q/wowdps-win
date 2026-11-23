@@ -606,8 +606,8 @@ pub fn load(
     dbd_dir: &std::path::Path,
     name: &str,
 ) -> Result<Csv, String> {
-    let db2 =
-        Db2::parse(game.fetch_fdid(file_id(name)?, 0x2)?).map_err(|e| format!("{name}: {e}"))?;
+    let db2 = Db2::parse(game.fetch_fdid(file_id(name)?, game.locale())?)
+        .map_err(|e| format!("{name}: {e}"))?;
     decode_by(&db2, &dbd_dir.join(format!("{name}.dbd")), name)
 }
 
@@ -622,8 +622,8 @@ pub fn load_refetching(
     name: &str,
     refetch: &mut dyn FnMut(&std::path::Path) -> Result<(), String>,
 ) -> Result<Csv, String> {
-    let db2 =
-        Db2::parse(game.fetch_fdid(file_id(name)?, 0x2)?).map_err(|e| format!("{name}: {e}"))?;
+    let db2 = Db2::parse(game.fetch_fdid(file_id(name)?, game.locale())?)
+        .map_err(|e| format!("{name}: {e}"))?;
     let path = dbd_dir.join(format!("{name}.dbd"));
     match decode_by(&db2, &path, name) {
         Ok(csv) => Ok(csv),

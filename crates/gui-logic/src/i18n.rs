@@ -43,6 +43,17 @@ impl Lang {
             .unwrap_or_default()
     }
 
+    /// The game client's locales whose data speaks it, in preference
+    /// order: what `gen-talent-trees --locale` names a dataset by.
+    pub fn game_locales(self) -> &'static [&'static str] {
+        match self {
+            Lang::En => &[],
+            Lang::Ru => &["ruRU"],
+            Lang::Es => &["esES", "esMX"],
+            Lang::De => &["deDE"],
+        }
+    }
+
     /// Its name in itself, for the selector (never translated).
     pub fn native(self) -> &'static str {
         match self {

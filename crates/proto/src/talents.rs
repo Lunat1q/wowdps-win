@@ -126,6 +126,36 @@ pub fn load_in(edition: wowdps_model::Edition) -> Result<&'static Json, String> 
     Ok(cache.get_or_init(|| parsed))
 }
 
+/// `edition`'s dataset in the game client's `locale` ("ruRU"):
+/// `talents-<locale>.json` beside the edition's own, written by
+/// `gen-talent-trees --locale`. `None` where there is none (that language
+/// not downloaded in the client when it was generated), or it is not this
+/// edition's. Read once per process, absent or not.
+pub fn load_locale_in(edition: wowdps_model::Edition, locale: &str) -> Option<&'static Json> {
+    use std::sync::Mutex;
+    type Cache = Vec<((wowdps_model::Edition, String), Option<&'static Json>)>;
+    static CACHE: Mutex<Cache> = Mutex::new(Vec::new());
+    let edition = edition.canonical().counts_as();
+    let key = (edition, locale.to_string());
+    let mut cache = CACHE.lock().ok()?;
+    if let Some((_, hit)) = cache.iter().find(|(k, _)| *k == key) {
+        return *hit;
+    }
+    let read = || {
+        let path = dataset_path_in(edition)
+            .ok()??
+            .with_file_name(format!("talents-{locale}.json"));
+        let parsed = crate::json::parse(&std::fs::read_to_string(path).ok()?).ok()?;
+        let want = edition.product().unwrap_or("wow");
+        let own = dataset_product(&parsed).is_none_or(|got| got == want);
+        // ponytail: leaked once per (edition, locale), as the OnceLocks above keep theirs.
+        own.then(|| &*Box::leak(Box::new(parsed)))
+    };
+    let hit = read();
+    cache.push((key, hit));
+    hit
+}
+
 /// The error for an edition no talent dataset is kept for.
 fn no_trees_for(edition: wowdps_model::Edition) -> String {
     format!(

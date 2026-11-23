@@ -54,6 +54,11 @@ const ART: &[&str] = &[
     "gen-emblems",
 ];
 
+/// The client locales `setup` also makes the talent trees in, one for each
+/// language the window speaks besides English: each where the client has
+/// that language's data downloaded, and passed over where it has not.
+const TALENT_LOCALES: &[&str] = &["ruRU", "deDE", "esES", "esMX"];
+
 const DBD_URL: &str = "https://raw.githubusercontent.com/wowdev/WoWDBDefs/master/definitions/";
 const KEYS_URL: &str = "https://raw.githubusercontent.com/wowdev/TACTKeys/master/WoW.txt";
 
@@ -76,9 +81,15 @@ fn setup_in(work: &Path) -> Result<(), String> {
     let mut failed = Vec::new();
     for (i, name) in ART.iter().enumerate() {
         println!("[{}/{}] {name}...", i + 1, ART.len());
-        if let Err(e) = setup_one(name, work, &keys) {
+        if let Err(e) = setup_one(name, work, &keys, &[]) {
             eprintln!("{name}: {e}");
             failed.push(*name);
+        }
+    }
+    for loc in TALENT_LOCALES {
+        println!("gen-talent-trees --locale {loc}...");
+        if let Err(e) = setup_one("gen-talent-trees", work, &keys, &["--locale", loc]) {
+            println!("  {loc} passed over (not downloaded in the client?): {e}");
         }
     }
     match failed.is_empty() {
@@ -87,7 +98,7 @@ fn setup_in(work: &Path) -> Result<(), String> {
     }
 }
 
-fn setup_one(name: &str, work: &Path, keys: &Path) -> Result<(), String> {
+fn setup_one(name: &str, work: &Path, keys: &Path, extra: &[&str]) -> Result<(), String> {
     let c = EXTRACT
         .find(name)
         .ok_or_else(|| format!("no command {name}"))?;
@@ -107,6 +118,7 @@ fn setup_one(name: &str, work: &Path, keys: &Path) -> Result<(), String> {
             keys.display().to_string(),
         ];
     }
+    words.extend(extra.iter().map(|w| w.to_string()));
     (c.run)(EXTRACT.args(words, c))
 }
 

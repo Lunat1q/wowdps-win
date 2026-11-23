@@ -101,7 +101,7 @@ impl Install {
 
 /// A client table's file from the install, by its FileDataID, parsed.
 pub fn fetch_db2(game: &Game, name: &str, fdid: u32) -> Result<Db2, String> {
-    Db2::parse(game.fetch_fdid(fdid, 0x2)?).map_err(|e| format!("{name}: {e}"))
+    Db2::parse(game.fetch_fdid(fdid, game.locale())?).map_err(|e| format!("{name}: {e}"))
 }
 
 /// A table's WoWDBDefs schema, read from its `.dbd` file and parsed.

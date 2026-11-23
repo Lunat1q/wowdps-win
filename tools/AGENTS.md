@@ -130,13 +130,14 @@ tools/gen-placed-spells.sh     # proto's placed_spells.rs (what the replay cut k
 tools/gen-role-signals.sh      # Forever's forever/role_signals.rs (R30, curated by name; Retail has none)
 tools/gen-icons.sh             # class-icons.bin (upscaled 4x; --no-upscale)
 tools/gen-spell-icons.sh       # spell-icons.bin (~58 MiB)
-tools/gen-talent-trees.sh      # talents.json (R14)
+tools/gen-talent-trees.sh      # talents.json (R14); --locale ruRU: talents-ruRU.json, the GUI's trees in that language
 tools/gen-talent-trees.sh --product wowf -o ~/.local/share/wowdps/forever/talents.json   # Forever's, where the talent tools read it
 tools/gen-spell-icons.sh --product wowf -o ~/.local/share/wowdps/forever/spell-icons.bin  # and talent-art, spell-tips: Forever's, where the GUI reads them
 tools/gen-talent-art.sh        # talent-art.bin (~60 MiB)
 tools/gen-spell-tips.sh        # spell-tips.bin (gui-logic's spell tips; ~7 s, 4 s when current)
 tools/gen-emblems.sh           # edition-emblems.bin (each game's emblem, from the launcher's own files)
-wowdps-extract setup           # every art cache above at once, no shell or upscaler (curl fetches);
+wowdps-extract setup           # every art cache above at once, no shell or upscaler (curl fetches), and the
+                               # talent trees in each GUI language the client has downloaded;
                                # wowdps-gui runs it from beside itself when a cache is missing
 tools/seed-creatures.sh        # NPC classifications from Wowhead into the store's creatures.tsv, under the addon's
 ```

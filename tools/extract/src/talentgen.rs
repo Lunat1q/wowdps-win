@@ -175,6 +175,19 @@ pub fn generate(
     icon_names: &HashMap<u32, String>,
     build: &str,
 ) -> Result<Generated, String> {
+    generate_in(tables, icon_names, build, "enUS")
+}
+
+/// [`generate`] from tables read in the client's `locale` ("ruRU"): the
+/// names and descriptions are the tables' own, and the words the tips add
+/// ("12 sec", "40 yd range", "Instant", "30 energy") are put in that
+/// language too where `Words` knows it.
+pub fn generate_in(
+    tables: &Tables,
+    icon_names: &HashMap<u32, String>,
+    build: &str,
+    locale: &str,
+) -> Result<Generated, String> {
     let class_names: HashMap<u32, &str> = CLASS_NAMES.into_iter().collect();
 
     // Spec metadata: id -> (name, class id, role).
@@ -604,7 +617,13 @@ pub fn generate(
                     }
                 }
             }
-            crate::spelltip::collect(tables, &wanted, &spell_names, &spell_ranks)?
+            let mut tips = crate::spelltip::collect(tables, &wanted, &spell_names, &spell_ranks)?;
+            if let Some(words) = Words::of(locale) {
+                for tip in tips.values_mut() {
+                    localize(tip, &words);
+                }
+            }
+            tips
         } else {
             HashMap::new()
         };
@@ -936,6 +955,206 @@ pub fn generate(
         nodes: n_nodes,
         nameless,
     })
+}
+
+// ---- the tips' own words in the client's language ---------------------------
+
+/// What the tips add to the tables' text, in one locale: the duration
+/// units, the decimal mark, the range, cast and cost lines, and the power
+/// names (`spelltip::power_name`'s).
+struct Words {
+    units: [&'static str; 3],
+    comma: bool,
+    range: &'static str,
+    cast: &'static str,
+    instant: &'static str,
+    base_pct: &'static str,
+    amount: &'static str,
+    powers: [(&'static str, &'static str); 18],
+}
+
+impl Words {
+    /// The locales the window speaks; any other keeps the English words.
+    fn of(locale: &str) -> Option<Words> {
+        match locale {
+            "ruRU" => Some(Words {
+                units: ["сек.", "мин.", "ч."],
+                comma: true,
+                range: "Радиус действия: {} м",
+                cast: "Время применения: {}",
+                instant: "Мгновенное действие",
+                base_pct: "{}% базового запаса {}",
+                amount: "{} {}",
+                powers: [
+                    ("mana", "ед. маны"),
+                    ("rage", "ед. ярости"),
+                    ("focus", "ед. концентрации"),
+                    ("energy", "ед. энергии"),
+                    ("combo points", "ед. приемов в серии"),
+                    ("runes", "рун"),
+                    ("runic power", "ед. силы рун"),
+                    ("soul shards", "ед. осколков души"),
+                    ("astral power", "ед. астральной силы"),
+                    ("holy power", "ед. энергии Света"),
+                    ("maelstrom", "ед. энергии Водоворота"),
+                    ("chi", "ед. ци"),
+                    ("insanity", "ед. безумия"),
+                    ("arcane charges", "чародейских зарядов"),
+                    ("fury", "ед. гнева"),
+                    ("pain", "ед. боли"),
+                    ("essence", "ед. сущности"),
+                    ("power", "ед. ресурса"),
+                ],
+            }),
+            "deDE" => Some(Words {
+                units: ["Sek.", "Min.", "Std."],
+                comma: true,
+                range: "{} m Reichweite",
+                cast: "{} Zauberzeit",
+                instant: "Spontanzauber",
+                // ponytail: a share of base power is only ever mana's.
+                base_pct: "{}% des Grundmanas",
+                amount: "{} {}",
+                powers: [
+                    ("mana", "Mana"),
+                    ("rage", "Wut"),
+                    ("focus", "Fokus"),
+                    ("energy", "Energie"),
+                    ("combo points", "Combopunkte"),
+                    ("runes", "Runen"),
+                    ("runic power", "Runenmacht"),
+                    ("soul shards", "Seelensplitter"),
+                    ("astral power", "Astralmacht"),
+                    ("holy power", "Heilige Kraft"),
+                    ("maelstrom", "Mahlstrom"),
+                    ("chi", "Chi"),
+                    ("insanity", "Wahnsinn"),
+                    ("arcane charges", "Arkanladungen"),
+                    ("fury", "Zorn"),
+                    ("pain", "Schmerz"),
+                    ("essence", "Essenz"),
+                    ("power", "Ressource"),
+                ],
+            }),
+            "esES" | "esMX" => Some(Words {
+                units: ["s", "min", "h"],
+                comma: false,
+                range: "Alcance de {} m",
+                cast: "Lanzamiento de {}",
+                instant: "Instantáneo",
+                base_pct: "{}% de {} base",
+                amount: "{} de {}",
+                powers: [
+                    ("mana", "maná"),
+                    ("rage", "ira"),
+                    ("focus", "enfoque"),
+                    ("energy", "energía"),
+                    ("combo points", "puntos de combo"),
+                    ("runes", "runas"),
+                    ("runic power", "poder rúnico"),
+                    ("soul shards", "fragmentos de alma"),
+                    ("astral power", "poder astral"),
+                    ("holy power", "poder sagrado"),
+                    ("maelstrom", "vorágine"),
+                    ("chi", "chi"),
+                    ("insanity", "demencia"),
+                    ("arcane charges", "cargas arcanas"),
+                    ("fury", "furia"),
+                    ("pain", "dolor"),
+                    ("essence", "esencia"),
+                    ("power", "poder"),
+                ],
+            }),
+            _ => None,
+        }
+    }
+
+    fn number(&self, n: &str) -> String {
+        if self.comma {
+            n.replace('.', ",")
+        } else {
+            n.to_string()
+        }
+    }
+
+    fn power(&self, english: &str) -> String {
+        self.powers
+            .iter()
+            .find(|(en, _)| *en == english)
+            .map_or_else(|| english.to_string(), |(_, w)| (*w).to_string())
+    }
+}
+
+/// `template`'s `{}` filled with `holes`, in order.
+fn fill(template: &str, holes: &[&str]) -> String {
+    let mut out = String::new();
+    let mut holes = holes.iter();
+    let mut parts = template.split("{}").peekable();
+    while let Some(part) = parts.next() {
+        out.push_str(part);
+        if parts.peek().is_some() {
+            out.push_str(holes.next().copied().unwrap_or_default());
+        }
+    }
+    out
+}
+
+/// The durations `spelltip` wrote into a text ("12 sec", "1.5 min",
+/// "1 hr"): a number word, then the unit word, its trailing punctuation
+/// kept. The tables' own words around them are left as they are.
+fn localize_units(text: &str, w: &Words) -> String {
+    let words: Vec<&str> = text.split(' ').collect();
+    let mut out: Vec<String> = words.iter().map(|s| (*s).to_string()).collect();
+    for i in 1..words.len() {
+        let (Some(prev), Some(word)) = (words.get(i - 1), words.get(i)) else {
+            continue;
+        };
+        let core = word.trim_end_matches(|c: char| c.is_ascii_punctuation());
+        let tail = word.get(core.len()..).unwrap_or_default();
+        let unit = match core {
+            "sec" => w.units[0],
+            "min" => w.units[1],
+            "hr" => w.units[2],
+            _ => continue,
+        };
+        if !prev.ends_with(|c: char| c.is_ascii_digit()) {
+            continue;
+        }
+        // "сек." before a sentence's own full stop reads as one.
+        let tail = if unit.ends_with('.') {
+            tail.strip_prefix('.').unwrap_or(tail)
+        } else {
+            tail
+        };
+        if let Some(slot) = out.get_mut(i) {
+            *slot = format!("{unit}{tail}");
+        }
+        if let Some(slot) = out.get_mut(i - 1) {
+            *slot = w.number(prev);
+        }
+    }
+    out.join(" ")
+}
+
+/// A tip's added words in `w`'s language.
+fn localize(tip: &mut crate::spelltip::Tip, w: &Words) {
+    tip.desc = localize_units(&tip.desc, w);
+    for d in &mut tip.desc_ranks {
+        *d = localize_units(d, w);
+    }
+    if let Some(n) = tip.range.strip_suffix(" yd range") {
+        tip.range = fill(w.range, &[&w.number(n)]);
+    }
+    if tip.cast == "Instant" {
+        tip.cast = w.instant.to_string();
+    } else if let Some(d) = tip.cast.strip_suffix(" cast") {
+        tip.cast = fill(w.cast, &[&localize_units(d, w)]);
+    }
+    if let Some((n, power)) = tip.cost.split_once("% of base ") {
+        tip.cost = fill(w.base_pct, &[&w.number(n), &w.power(power)]);
+    } else if let Some((n, power)) = tip.cost.split_once(' ') {
+        tip.cost = fill(w.amount, &[&w.number(n), &w.power(power)]);
+    }
 }
 
 #[cfg(test)]
@@ -1374,6 +1593,39 @@ mod tests {
             generate(&t, &icons, "1")
                 .unwrap_err()
                 .contains("row has no column")
+        );
+    }
+
+    /// The words the tips add go into the client's language; the tables'
+    /// own words around them stay as they are.
+    #[test]
+    fn a_locale_puts_the_added_words_in_its_language() {
+        let mut tip = crate::spelltip::Tip {
+            desc: "Ускоряет на 1.5 sec. Длится 2 min и 1 hr".to_string(),
+            cost: "30 energy".to_string(),
+            range: "40 yd range".to_string(),
+            cast: "1.5 sec cast".to_string(),
+            desc_ranks: vec!["1 sec, 3 apples".to_string()],
+        };
+        let ru = Words::of("ruRU").unwrap();
+        localize(&mut tip, &ru);
+        assert_eq!(tip.desc, "Ускоряет на 1,5 сек. Длится 2 мин. и 1 ч.");
+        assert_eq!(tip.desc_ranks, ["1 сек., 3 apples"]);
+        assert_eq!(tip.cost, "30 ед. энергии");
+        assert_eq!(tip.range, "Радиус действия: 40 м");
+        assert_eq!(tip.cast, "Время применения: 1,5 сек.");
+
+        let mut tip = crate::spelltip::Tip {
+            cost: "5% of base mana".to_string(),
+            cast: "Instant".to_string(),
+            ..Default::default()
+        };
+        localize(&mut tip, &Words::of("deDE").unwrap());
+        assert_eq!(tip.cost, "5% des Grundmanas");
+        assert_eq!(tip.cast, "Spontanzauber");
+        assert!(
+            Words::of("frFR").is_none(),
+            "other locales keep English words"
         );
     }
 

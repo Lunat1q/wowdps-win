@@ -131,6 +131,9 @@ pub struct Game {
     /// The `.build.info` product its build was read for: which edition of
     /// the game its files are.
     product: String,
+    /// The locale its tables are read in (`tact::LOCALES`): enUS unless
+    /// [`Game::with_locale`] names another.
+    locale: u32,
 }
 
 impl Game {
@@ -193,6 +196,7 @@ impl Game {
             index: std::sync::OnceLock::new(),
             build: info.version,
             product: product.to_string(),
+            locale: 0x2,
         })
     }
 
@@ -208,6 +212,19 @@ impl Game {
         } else {
             format!("{} (product {})", self.build, self.product)
         }
+    }
+
+    /// The same storage, its tables read in `locale` (a `tact::LOCALES`
+    /// mask): a table of strings the client has not downloaded in that
+    /// locale is an error, never the English copy.
+    pub fn with_locale(mut self, locale: u32) -> Game {
+        self.locale = locale;
+        self
+    }
+
+    /// The locale its tables are read in.
+    pub fn locale(&self) -> u32 {
+        self.locale
     }
 
     pub fn root(&self) -> &[u8] {
