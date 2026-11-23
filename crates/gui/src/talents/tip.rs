@@ -60,9 +60,12 @@ pub(crate) fn tooltip(
     arrive: f32,
 ) -> AnyElement {
     let (w, h) = (f32::from(area.size.width), f32::from(area.size.height));
-    let tw = logic::tip_width(w);
-    let lines = logic::tooltip_lines(node, requires, logic::tip_budget(tw));
-    let th = logic::tip_height(&lines);
+    // The box is laid out at 1 and drawn `k` times larger: the window's
+    // zoom, and the trees' fit where they grew.
+    let k = p.z * p.s.max(1.0);
+    let tw0 = logic::tip_width(w / k);
+    let lines = logic::tooltip_lines(node, requires, logic::tip_budget(tw0));
+    let (tw, th) = (tw0 * k, logic::tip_height(&lines) * k);
     let cur = (
         anchor.0 - f32::from(area.origin.x),
         anchor.1 - f32::from(area.origin.y),
@@ -71,10 +74,10 @@ pub(crate) fn tooltip(
     let rows = lines.into_iter().map(|line| {
         let color = tone(p, line.tone);
         let row = div()
-            .h(px(line.size + 4.0))
+            .h(px((line.size + 4.0) * k))
             .flex()
             .items_center()
-            .text_size(px(line.size))
+            .text_size(px(line.size * k))
             .text_color(color)
             .whitespace_nowrap()
             .child(div().flex_1().child(line.text));
@@ -92,9 +95,9 @@ pub(crate) fn tooltip(
         .w(px(tw))
         .h(px(th))
         .opacity(arrive)
-        .pt(px(7.0))
-        .px(px(logic::TIP_PAD_X))
-        .rounded(p.r(4.0))
+        .pt(px(7.0 * k))
+        .px(px(logic::TIP_PAD_X * k))
+        .rounded(p.r(4.0 * k))
         .font_family(crate::theme::face(&p.def.faces.ui))
         .flex()
         .flex_col()

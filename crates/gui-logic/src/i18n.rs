@@ -405,7 +405,6 @@ const WORDS: &[Entry] = &[
     ("someone else", "кто-то другой", "otra persona", "jemand anderes"),
     ("personal best", "личный рекорд", "mejor marca personal", "persönliche Bestleistung"),
     ("effective dps", "эффективный DPS", "DPS efectivo", "effektive DPS"),
-    ("the clipboard is empty", "буфер обмена пуст", "el portapapeles está vacío", "die Zwischenablage ist leer"),
     ("the paste carried no talent strings", "во вставке нет строк талантов", "lo pegado no contenía cadenas de talentos", "die Einfügung enthielt keine Talent-Strings"),
     ("died {} times, first {}", "умер {} раз, впервые {}", "murió {} veces, la primera {}", "starb {}-mal, zuerst {}"),
     ("died {} times", "умер {} раз", "murió {} veces", "starb {}-mal"),
@@ -616,6 +615,33 @@ const WORDS: &[Entry] = &[
     ("the pull list", "список пуллов", "la lista de pulls", "die Pull-Liste"),
     ("the comparison", "сравнение", "la comparación", "der Vergleich"),
     ("the talent viewer", "просмотр талантов", "el visor de talentos", "die Talentansicht"),
+    // The talent viewer: its chrome, the inventory, the tooltip's own words
+    // (a talent's name and text are the game data's, in the client's language).
+    ("talents", "таланты", "talentos", "Talente"),
+    ("inventory", "инвентарь", "inventario", "Inventar"),
+    ("paste simc/string", "вставить simc/строку", "pegar simc/cadena", "simc/String einfügen"),
+    ("loadouts", "наборы", "configuraciones", "Loadouts"),
+    ("active", "активный", "activa", "aktiv"),
+    ("dataset build {}", "данные сборки {}", "datos de la versión {}", "Datensatz-Build {}"),
+    ("from combat log", "из журнала боя", "del registro de combate", "aus dem Kampflog"),
+    ("edited", "изменено", "editado", "bearbeitet"),
+    ("copy string", "копировать строку", "copiar cadena", "String kopieren"),
+    ("copied ✓", "скопировано ✓", "copiado ✓", "kopiert ✓"),
+    ("paste a talent string or a SimulationCraft export to see a build", "вставьте строку талантов или экспорт SimulationCraft, чтобы увидеть билд", "pega una cadena de talentos o una exportación de SimulationCraft para ver una build", "Talent-String oder SimulationCraft-Export einfügen, um einen Build zu sehen"),
+    ("click picks (+1 rank) · right-click refunds · octagons open their option picker · ctrl +/− text size · esc closes · tab flips inventory · drop a simc export here", "клик выбирает (+1 ранг) · правый клик возвращает · восьмиугольники открывают выбор · ctrl +/− размер текста · esc закрывает · tab — инвентарь · перетащите сюда экспорт simc", "clic elige (+1 rango) · clic derecho devuelve · los octágonos abren su selector · ctrl +/− tamaño del texto · esc cierra · tab cambia al inventario · suelta aquí una exportación de simc", "Klick wählt (+1 Rang) · Rechtsklick erstattet · Achtecke öffnen ihre Auswahl · Strg +/− Textgröße · Esc schließt · Tab wechselt zum Inventar · simc-Export hier ablegen"),
+    ("cannot read {}", "не удаётся прочитать {}", "no se puede leer {}", "{} kann nicht gelesen werden"),
+    ("equipped", "надето", "equipado", "angelegt"),
+    ("in bags", "в сумках", "en las bolsas", "in Taschen"),
+    ("currencies", "валюта", "monedas", "Währungen"),
+    ("equipped — from combat log", "надето — из журнала боя", "equipado — del registro de combate", "angelegt — aus dem Kampflog"),
+    ("item {}", "предмет {}", "objeto {}", "Gegenstand {}"),
+    ("the clipboard is empty", "буфер обмена пуст", "el portapapeles está vacío", "die Zwischenablage ist leer"),
+    ("Talent", "Талант", "Talento", "Talent"),
+    ("Rank {}/{}", "Ранг {}/{}", "Rango {}/{}", "Rang {}/{}"),
+    ("Rank {}", "Ранг {}", "Rango {}", "Rang {}"),
+    ("Requires {}", "Требуется: {}", "Requiere {}", "Benötigt {}"),
+    ("{}/{} pts", "{}/{} очк.", "{}/{} ptos.", "{}/{} Pkt."),
+    ("{} pts", "{} очк.", "{} ptos.", "{} Pkt."),
 ];
 
 #[cfg(test)]
@@ -644,6 +670,12 @@ mod tests {
         // A hole is never empty, and the whole line must fit.
         assert_eq!(tr_in(Lang::Ru, "Raid "), "Raid ");
         assert_eq!(tr_in(Lang::Ru, "Raids"), "Raids");
+        // The talent tooltip's rank, and the meter's longer line still its own.
+        assert_eq!(tr_in(Lang::Ru, "Rank 2/3"), "Ранг 2/3");
+        assert_eq!(
+            tr_in(Lang::De, "Rank is among your role, by dps."),
+            "Rang innerhalb deiner Rolle, nach dps."
+        );
     }
 
     #[test]

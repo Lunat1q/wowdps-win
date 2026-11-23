@@ -138,6 +138,8 @@ pub struct TalentViewer {
     copied_until: Option<std::time::Instant>,
     /// The trees' fit at the last frame (above 1 where they have room).
     pub(crate) last_fit: f32,
+    /// The window's zoom (Ctrl +/−), which the viewer's words are drawn at.
+    pub zoom: f32,
     /// Whether the trees fit the width at that fit: centred if so, else
     /// scrolled from their left edge.
     fits: bool,
@@ -186,6 +188,7 @@ impl TalentViewer {
             area: Rc::new(std::cell::Cell::new(Bounds::default())),
             copied_until: None,
             last_fit: 1.0,
+            zoom: 1.0,
             fits: true,
             _subscriptions: vec![typed],
         }
@@ -335,6 +338,9 @@ pub(crate) struct Paint {
     /// Device pixels per logical pixel (the display's scale factor): what
     /// a crest is chosen by, the drawn size of it.
     pub scale: f32,
+    /// The words' zoom: the window's for the chrome, 1 inside the trees
+    /// (their sizes are at the trees' fit already).
+    pub z: f32,
     /// The game whose trees are shown: its art caches alone are read.
     pub edition: Edition,
 }
@@ -355,7 +361,7 @@ impl Paint {
     pub fn words(&self, text: impl Into<SharedString>, size: f32, color: Hsla) -> gpui_kit::Div {
         div()
             .font_family(crate::theme::face(&self.def.faces.ui))
-            .text_size(px(size))
+            .text_size(px(size * self.z))
             .text_color(color)
             .child(crate::theme::tr(text))
     }
@@ -364,7 +370,7 @@ impl Paint {
     pub fn text(&self, text: impl Into<SharedString>, size: f32, color: Hsla) -> gpui_kit::Div {
         div()
             .font_family(crate::theme::face(&self.def.faces.ui))
-            .text_size(px(size))
+            .text_size(px(size * self.z))
             .text_color(color)
             .whitespace_nowrap()
             .child(crate::theme::tr(text))
@@ -462,6 +468,7 @@ impl Render for TalentViewer {
             t,
             s,
             scale: window.scale_factor(),
+            z: self.zoom,
             edition: self.ui.edition,
         };
         let motion = self.motion(window, cx);
@@ -592,7 +599,7 @@ impl Render for TalentViewer {
             _ => self.talents_tab(&p, &motion, cx),
         };
         body = body.child(div().flex_1().min_h_0().child(content)).child(p.words(
-            "click picks (+1 rank) · right-click refunds · octagons open their option picker · esc closes · tab flips inventory · drop a simc export here",
+            "click picks (+1 rank) · right-click refunds · octagons open their option picker · ctrl +/− text size · esc closes · tab flips inventory · drop a simc export here",
             12.,
             ink_2,
         ));
@@ -741,11 +748,16 @@ impl TalentViewer {
 
         let viewer = cx.entity().downgrade();
         let s = p.s;
+        // Inside the trees the words go at the trees' fit alone.
+        let tree_p = Paint {
+            z: 1.0,
+            ..p.clone()
+        };
         let pane_el = |i: usize, model: &Rc<PaneModel>| {
             pane::pane(pane::PaneArgs {
                 index: i,
                 model: Rc::clone(model),
-                paint: p.clone(),
+                paint: tree_p.clone(),
                 picker: ui.picker,
                 hover: self.pane_hover.get(i).copied().flatten(),
                 motion,
@@ -756,6 +768,7 @@ impl TalentViewer {
         let crest = 20. * s * p.scale;
         let header = |icon: Option<crate::images::Tile>, name: &str, model: &PaneModel| {
             let (label, full) = logic::points_label(model.points, model.cap);
+            let p = &tree_p;
             div()
                 .flex()
                 .items_center()
@@ -797,7 +810,7 @@ impl TalentViewer {
             );
         if let Some((hero_id, hero_name)) = &b.hero {
             row = row.child(hero_column(
-                p,
+                &tree_p,
                 *hero_id,
                 hero_name,
                 b.hero_pane.as_ref().map(|m| pane_el(1, m)),

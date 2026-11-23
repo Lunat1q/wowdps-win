@@ -213,6 +213,7 @@ pub fn tip_budget(tw: f32) -> usize {
 /// restriction paragraph in blue, exactly how the game colours them —
 /// wrapped at `budget` characters.
 pub fn tooltip_lines(n: &Node, requires: &str, budget: usize) -> Vec<TipLine> {
+    use crate::i18n::tr;
     let mut lines: Vec<TipLine> = Vec::new();
     let mut push = |text: String, right: Option<String>, tone: Tone, size: f32| {
         lines.push(TipLine {
@@ -232,7 +233,7 @@ pub fn tooltip_lines(n: &Node, requires: &str, budget: usize) -> Vec<TipLine> {
         Tone::Plain,
         13.0,
     );
-    push("Talent".to_string(), None, Tone::Meta, 10.0);
+    push(tr("Talent").into_owned(), None, Tone::Meta, 10.0);
     match (n.cost.is_empty(), n.range.is_empty()) {
         (false, false) => push(n.cost.clone(), Some(n.range.clone()), Tone::Plain, 11.0),
         (false, true) => push(n.cost.clone(), None, Tone::Plain, 11.0),
@@ -243,10 +244,15 @@ pub fn tooltip_lines(n: &Node, requires: &str, budget: usize) -> Vec<TipLine> {
         push(n.cast.clone(), None, Tone::Plain, 11.0);
     }
     if !requires.is_empty() {
-        push(format!("Requires {requires}"), None, Tone::Plain, 11.0);
+        push(
+            tr(&format!("Requires {}", tr(requires))).into_owned(),
+            None,
+            Tone::Plain,
+            11.0,
+        );
     }
     push(
-        format!("Rank {}/{}", n.ranks, n.max_ranks),
+        tr(&format!("Rank {}/{}", n.ranks, n.max_ranks)).into_owned(),
         None,
         Tone::Meta,
         10.0,
@@ -279,7 +285,12 @@ pub fn tooltip_lines(n: &Node, requires: &str, budget: usize) -> Vec<TipLine> {
         let mut cum: u64 = 0;
         for (ti, tier) in n.tiers.iter().enumerate() {
             push(String::new(), None, Tone::Plain, 4.0);
-            push(format!("Rank {}", ti + 1), None, Tone::Plain, 11.0);
+            push(
+                tr(&format!("Rank {}", ti + 1)).into_owned(),
+                None,
+                Tone::Plain,
+                11.0,
+            );
             if tier.max_ranks > 1 && tier.desc_ranks.len() >= tier.max_ranks as usize {
                 for k in 1..=tier.max_ranks {
                     if k > 1 {

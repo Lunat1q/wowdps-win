@@ -740,6 +740,12 @@ impl Gui {
         }
         .clamp(ZOOM_MIN, ZOOM_MAX);
         self.cfg.zoom = z;
+        if let Some(viewer) = &self.talents {
+            viewer.update(cx, |v, cx| {
+                v.zoom = z;
+                cx.notify();
+            });
+        }
         // One key, over the file as it is now: an overlay drag saved since
         // launch survives (the iced window's `save` did not, D2).
         Config::store(|c| c.zoom = z);
@@ -827,6 +833,7 @@ impl Gui {
             guid: r.key.clone(),
         });
         let session = self.session.clone();
+        let zoom = self.cfg.zoom;
         // A stored pull's answer carried its players' builds already.
         let stored = self
             .hist
@@ -838,6 +845,7 @@ impl Gui {
         // wore in it, which wins over a stored paste.
         let viewer = cx.new(|cx| {
             let mut viewer = TalentViewer::open(edition, player.clone(), window, cx);
+            viewer.zoom = zoom;
             viewer.say_gap(gap, cx);
             match (&stored, &player) {
                 (Some(Some(loadout)), _) => viewer.adopt_logged(loadout, cx),
