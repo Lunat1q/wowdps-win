@@ -619,7 +619,9 @@ impl Overlay {
             // is let go (`surface.rs`).
             .on_mouse_down(
                 MouseButton::Left,
-                cx.listener(|this, e: &gpui_kit::MouseDownEvent, _, _| this.grip_down(e.position)),
+                cx.listener(|this, e: &gpui_kit::MouseDownEvent, window, cx| {
+                    this.grip_down(e.position, window, cx)
+                }),
             )
             .on_mouse_up(
                 MouseButton::Left,
@@ -729,7 +731,9 @@ impl Overlay {
             // is let go (`surface.rs`).
             .on_mouse_down(
                 MouseButton::Left,
-                cx.listener(|this, e: &gpui_kit::MouseDownEvent, _, _| this.grip_down(e.position)),
+                cx.listener(|this, e: &gpui_kit::MouseDownEvent, window, cx| {
+                    this.grip_down(e.position, window, cx)
+                }),
             )
             .on_mouse_up(
                 MouseButton::Left,
@@ -1363,9 +1367,15 @@ impl Overlay {
                 11.,
                 if self.view_menu { yellow } else { dim },
             ))
+            // Either press opens the view menu; a left one closes it again.
             .on_mouse_down(
                 MouseButton::Left,
-                cx.listener(move |this, _, _, cx| this.set_view(view.next(), cx)),
+                cx.listener(|this, _, _, cx| {
+                    this.view_menu = !this.view_menu;
+                    this.view_hover = None;
+                    cx.stop_propagation();
+                    cx.notify();
+                }),
             )
             .on_mouse_down(
                 MouseButton::Right,

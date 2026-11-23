@@ -497,16 +497,24 @@ fn the_overlay_follows_the_config_s_theme(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
-fn the_view_name_cycles_and_its_menu_picks(cx: &mut TestAppContext) {
+fn the_view_name_opens_its_menu_which_picks(cx: &mut TestAppContext) {
     let rig = kill(cx);
+    let view = |cx: &mut TestAppContext| rig.session.read_with(cx, |s, _| s.state().view);
     cx.update_window(rig.window, |_, window, cx| {
         window.render_frame(cx);
         window.click("view-name", cx);
+        window.render_frame(cx);
+        assert!(
+            window.try_find("view-menu").is_some(),
+            "a left press opens the menu"
+        );
+        window.click("view-name", cx);
+        window.render_frame(cx);
+        assert!(window.try_find("view-menu").is_none(), "and closes it");
     })
     .unwrap();
     settle(cx, &rig.session);
-    let view = |cx: &mut TestAppContext| rig.session.read_with(cx, |s, _| s.state().view);
-    assert_eq!(view(cx), View::Healing, "a left press cycles");
+    assert_eq!(view(cx), View::Damage, "a press picks nothing by itself");
 
     cx.update_window(rig.window, |_, window, cx| {
         window.render_frame(cx);
@@ -610,6 +618,28 @@ fn the_header_collapses_the_panel_and_the_tab_expands_it(cx: &mut TestAppContext
         assert!(window.try_find("header").is_some(), "expanded again");
     })
     .unwrap();
+}
+
+/// macOS and Windows: the window is the content, so a drag moves nothing
+/// while it lasts; let go, the offset along the edge is remembered and the
+/// window reopens there.
+#[cfg(any(target_os = "macos", windows))]
+#[gpui_kit::test]
+fn a_drag_on_the_grip_moves_the_panel_along_the_edge_when_let_go(cx: &mut TestAppContext) {
+    let rig = kill(cx);
+    let start = config().offset;
+    cx.update_window(rig.window, |_, window, cx| {
+        window.render_frame(cx);
+        let b = window.find("header").bounds();
+        let at = gpui_kit::point(b.origin.x + px(60.), b.origin.y + px(8.));
+        window.drag(at, gpui_kit::point(at.x + px(30.), at.y + px(150.)), cx);
+    })
+    .unwrap();
+    rig.overlay.read_with(cx, |o, _| {
+        assert!(o.expanded, "a drag is not a click");
+        assert_eq!(o.cfg.offset, start + 150, "down the edge, not across");
+    });
+    assert_eq!(Config::load().offset, start + 150, "remembered, by itself");
 }
 
 #[gpui_kit::test]

@@ -76,10 +76,9 @@ impl Strip {
     }
 
     /// The offset a drag leaves behind: where the content started, moved by
-    /// the pointer's travel along the edge, clamped as `place` would.
-    /// macOS's window is the content, so nothing slides there; everywhere
-    /// else does (tests cover the math).
-    #[cfg(any(not(any(target_os = "macos", windows)), test))]
+    /// the pointer's travel along the edge, clamped as `place` would. On
+    /// macOS and Windows the strip is the display's, the window reopening
+    /// at the offset when the drag ends.
     pub fn dragged(&self, content: (f32, f32), from: f32, travel: (f32, f32)) -> f32 {
         let delta = if self.edge.is_vertical() {
             travel.1

@@ -41,6 +41,10 @@ pub struct Grip {
     at: Point<Pixels>,
     from: f32,
     pub moved: bool,
+    /// The display's logical size at the press: on macOS and Windows the
+    /// window is the content, so the edge's length is the display's.
+    #[cfg_attr(not(any(target_os = "macos", windows)), allow(dead_code))]
+    screen: Option<(f32, f32)>,
 }
 
 /// The tab was dropped by another edge: the surface is recreated there.
@@ -140,18 +144,25 @@ impl Overlay {
 
     /// The grip pressed (the header, the tab): a click or a drag, decided
     /// by how far it travels before it is let go.
-    pub(super) fn grip_down(&mut self, at: Point<Pixels>) {
+    pub(super) fn grip_down(&mut self, at: Point<Pixels>, window: &Window, cx: &App) {
         super::autos::trace(self.started, format_args!("grip pressed at {at:?}"));
+        let screen = window.display(cx).map(|d| {
+            let s = d.bounds().size;
+            (f32::from(s.width), f32::from(s.height))
+        });
         self.grip = Some(Grip {
             at,
             from: self.offset,
             moved: false,
+            screen,
         });
     }
 
     /// The pointer moved with the grip held: past the threshold it is a
-    /// drag, and the content follows it along the edge. `cx` drives the
-    /// redraw on Linux; macOS only decides click-vs-drag.
+    /// drag, and the content follows it along the edge. On Linux the
+    /// content slides within the strip as it goes; on macOS and Windows the
+    /// window IS the content, so the offset is only tracked here and the
+    /// window reopens there when the grip is let go (`grip_up`).
     #[cfg_attr(any(target_os = "macos", windows), allow(unused_variables))]
     pub(super) fn grip_moved(&mut self, to: Point<Pixels>, cx: &mut Context<Self>) {
         let (Some(grip), Some(placed)) = (self.grip.as_mut(), self.placed) else {
@@ -161,19 +172,25 @@ impl Overlay {
         if !grip.moved && travel.0.hypot(travel.1) > DRAG_THRESHOLD {
             grip.moved = true;
         }
-        if grip.moved {
-            // macOS: the window IS the content, so nothing slides within
-            // the strip — the pointer travel is just the drag threshold.
+        if !grip.moved {
+            return;
+        }
+        #[cfg(not(any(target_os = "macos", windows)))]
+        let offset = placed.strip.dragged(placed.content, grip.from, travel);
+        #[cfg(any(target_os = "macos", windows))]
+        let Some(offset) = grip.screen.map(|screen| {
+            let strip = Strip {
+                edge: self.cfg.edge,
+                screen,
+            };
+            strip.dragged(placed.content, grip.from, travel)
+        }) else {
+            return;
+        };
+        if offset != self.offset {
+            self.offset = offset;
             #[cfg(not(any(target_os = "macos", windows)))]
-            {
-                let offset = placed.strip.dragged(placed.content, grip.from, travel);
-                if offset != self.offset {
-                    self.offset = offset;
-                    cx.notify();
-                }
-            }
-            #[cfg(any(target_os = "macos", windows))]
-            let _ = placed;
+            cx.notify();
         }
     }
 
@@ -206,6 +223,12 @@ impl Overlay {
             return;
         }
         let offset = self.offset.round() as i32;
+        // macOS and Windows: the window is placed only when it opens, so a
+        // moved offset reopens it there (render emits the `Reanchor`).
+        #[cfg(any(target_os = "macos", windows))]
+        if offset != self.cfg.offset {
+            self.reopen = true;
+        }
         self.cfg.offset = offset;
         Config::store(|c| c.offset = offset);
         cx.notify();

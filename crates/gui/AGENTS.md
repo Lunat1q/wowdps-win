@@ -69,8 +69,9 @@ Read before the work it covers:
   there is no input region, so the strip's spanning surface would eat the
   game's clicks along the edge. Hidden is a 1 px window. A size change
   re-anchors (the `Reanchor` event reopens; a `resize` keeps the wrong
-  corner fixed and an origin cannot move), and a drag slides nothing — the
-  offset stays as configured.
+  corner fixed and an origin cannot move). A drag slides nothing while it
+  lasts; let go, its offset along the edge (the display's length) is saved
+  and the window reopens there. Windows takes the same panel.
 - Its output/display is chosen before the app starts: Linux finds it by
   recomputing GPUI's UUIDv5 of the output name
   (`gui_logic::output::output_uuid`), macOS by the display's 1-based index
