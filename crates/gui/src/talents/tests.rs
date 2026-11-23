@@ -531,10 +531,10 @@ fn a_narrow_window_fits_the_trees_before_it_scrolls(cx: &mut TestAppContext) {
     wide.viewer
         .update(cx, |v, cx| v.adopt_logged(&logged(), cx));
     wide.with(cx, |window, cx| window.render_frame(cx));
-    assert_eq!(
-        wide.read(cx, |v| v.last_fit),
-        1.0,
-        "a wide window draws them whole"
+    let grown = wide.read(cx, |v| v.last_fit);
+    assert!(
+        (1.0..=super::MAX_FIT).contains(&grown),
+        "a big window draws them whole, grown to its room: {grown}"
     );
 }
 

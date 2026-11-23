@@ -101,6 +101,8 @@ const TIP_IN: Duration = Duration::from_millis(140);
 const COPIED_FOR: Duration = Duration::from_millis(1400);
 /// The tree's smallest fit: below it the panes scroll rather than shrink.
 const MIN_FIT: f32 = 0.7;
+/// The tree's largest fit: a big window draws it up to this much larger.
+const MAX_FIT: f32 = 2.5;
 /// The biggest file a drop reads (a simc export is a few KiB).
 const DROP_MAX: u64 = 1 << 20;
 
@@ -134,7 +136,7 @@ pub struct TalentViewer {
     area: Rc<std::cell::Cell<Bounds<Pixels>>>,
     /// "copy string" just copied, until this instant.
     copied_until: Option<std::time::Instant>,
-    /// The trees' fit at the last frame (1 where they fit).
+    /// The trees' fit at the last frame (above 1 where they have room).
     pub(crate) last_fit: f32,
     /// Whether the trees fit the width at that fit: centred if so, else
     /// scrolled from their left edge.
@@ -328,7 +330,7 @@ impl TalentViewer {
 pub(crate) struct Paint {
     pub def: std::sync::Arc<Def>,
     pub t: TalentTokens,
-    /// The trees' scale: 1 when they fit, less (to `MIN_FIT`) when not.
+    /// The trees' scale: up to `MAX_FIT` with room, down to `MIN_FIT` without.
     pub s: f32,
     /// Device pixels per logical pixel (the display's scale factor): what
     /// a crest is chosen by, the drawn size of it.
@@ -416,18 +418,38 @@ fn content_width(b: &Build) -> f32 {
     b.class_pane.w + b.spec_pane.w + hero_w + 2.0 * 24.0 + 32.0
 }
 
+/// The tree row's natural height: the taller of a side pane under its
+/// header and the hero column (ring, name, points, plate), plus the row's
+/// padding.
+fn content_height(b: &Build) -> f32 {
+    let side = b.class_pane.h.max(b.spec_pane.h) + 20.0 + 4.0;
+    let hero = match (&b.hero, &b.hero_pane) {
+        (Some(_), Some(p)) => 168.0 + 14.0 * 1.3 + 12.0 * 1.3 + p.h + 16.0 + 2.0 + 18.0,
+        (Some(_), None) => 168.0 + 14.0 * 1.3 + 6.0,
+        _ => 0.0,
+    };
+    side.max(hero) + 8.0 + 12.0
+}
+
 impl Render for TalentViewer {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let look = Look::global(cx);
         let def = look.def;
         // The viewer fills the window inside its 10 px margin; the trees
-        // fit that width, down to `MIN_FIT`, before they scroll.
+        // grow to fill the tree area (its height as last painted, the
+        // window's less the chrome before the first paint), up to
+        // `MAX_FIT`, and shrink to fit its width, down to `MIN_FIT`,
+        // before they scroll.
         let avail = f32::from(window.viewport_size().width) - 20.0;
-        let s = self
-            .ui
-            .build
-            .as_ref()
-            .map_or(1.0, |b| (avail / content_width(b)).clamp(MIN_FIT, 1.0));
+        let area_h = match f32::from(self.area.get().size.height) {
+            h if h > 0.0 => h,
+            _ => f32::from(window.viewport_size().height) - 200.0,
+        };
+        let s = self.ui.build.as_ref().map_or(1.0, |b| {
+            (avail / content_width(b))
+                .min(area_h / content_height(b))
+                .clamp(MIN_FIT, MAX_FIT)
+        });
         self.last_fit = s;
         self.fits = self
             .ui
@@ -819,9 +841,18 @@ impl TalentViewer {
             .mx(px(-10.))
             .overflow_hidden()
             .child(
-                gpui_kit::canvas(move |bounds, _, _| area_cell.set(bounds), |_, _, _, _| {})
-                    .absolute()
-                    .size_full(),
+                // The fit reads this height: a change draws again at it.
+                gpui_kit::canvas(
+                    move |bounds, window, _| {
+                        if area_cell.get() != bounds {
+                            area_cell.set(bounds);
+                            window.refresh();
+                        }
+                    },
+                    |_, _, _, _| {},
+                )
+                .absolute()
+                .size_full(),
             );
         if let Some((painting, w, h)) = art::background(p.edition, b.spec_id) {
             area = area
