@@ -676,6 +676,7 @@ fn shape(
     color: Hsla,
     ui: &SharedString,
 ) -> gpui_kit::ShapedLine {
+    let s = crate::theme::tr(s.to_string());
     let run = TextRun {
         len: s.len(),
         font: Font {
@@ -687,9 +688,7 @@ fn shape(
         underline: None,
         strikethrough: None,
     };
-    window
-        .text_system()
-        .shape_line(SharedString::from(s.to_string()), px(size), &[run], None)
+    window.text_system().shape_line(s, px(size), &[run], None)
 }
 
 /// The tooltip, placed: its box and its pieces.

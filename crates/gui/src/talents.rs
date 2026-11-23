@@ -353,7 +353,7 @@ impl Paint {
             .font_family(crate::theme::face(&self.def.faces.ui))
             .text_size(px(size))
             .text_color(color)
-            .child(text.into())
+            .child(crate::theme::tr(text))
     }
 
     /// `text` at `size` in the window's face and `color`.
@@ -363,7 +363,7 @@ impl Paint {
             .text_size(px(size))
             .text_color(color)
             .whitespace_nowrap()
-            .child(text.into())
+            .child(crate::theme::tr(text))
     }
 
     /// A corner the viewer draws at `v` px, at the theme's shape.

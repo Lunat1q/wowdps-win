@@ -232,7 +232,7 @@ impl W {
             .text_size(self.z(size))
             .text_color(color)
             .whitespace_nowrap()
-            .child(words.into())
+            .child(crate::theme::tr(words))
     }
 
     /// One line of words that takes its colour from its parent: the label
@@ -243,7 +243,7 @@ impl W {
             .font_weight(weight)
             .text_size(self.z(size))
             .whitespace_nowrap()
-            .child(words.into())
+            .child(crate::theme::tr(words))
     }
 
     /// One line in the title face (Marcellus).

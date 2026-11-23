@@ -155,8 +155,12 @@ impl Input {
 }
 
 /// A headless app with the window's fonts, the shots' theme
-/// (`WOWDPS_SHOTS_THEME`, else navy), motion reduced.
+/// (`WOWDPS_SHOTS_THEME`, else navy) and language (`WOWDPS_SHOTS_LANG`,
+/// else English), motion reduced.
 pub(crate) fn app() -> HeadlessAppContext {
+    if let Ok(lang) = std::env::var("WOWDPS_SHOTS_LANG") {
+        wowdps_gui_logic::i18n::set(wowdps_gui_logic::i18n::Lang::from_key(&lang));
+    }
     let mut cx = testkit::headless();
     cx.update(|cx| {
         cx.set_reduce_motion(true);

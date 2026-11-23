@@ -21,6 +21,17 @@ use std::sync::{Arc, LazyLock};
 use gpui_kit::{App, Global, Hsla, Rgba, SharedString, px};
 use wowdps_gui_logic::theme::{self as gl, Accent, Def, Registry};
 
+/// Words drawn, in the GUI's language (`i18n::tr`): the same string
+/// when nothing translates it, so English allocates nothing.
+pub fn tr(words: impl Into<SharedString>) -> SharedString {
+    let words: SharedString = words.into();
+    let out = match wowdps_gui_logic::i18n::tr(&words) {
+        std::borrow::Cow::Borrowed(b) if std::ptr::eq(b, words.as_ref()) => None,
+        t => Some(t.into_owned()),
+    };
+    out.map_or(words, SharedString::from)
+}
+
 /// A theme's words (a face's family) as GPUI's: a compiled-in literal
 /// stays one, a config's shares its string — neither allocates.
 pub fn face(t: &gl::Text) -> SharedString {

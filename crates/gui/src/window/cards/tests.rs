@@ -107,6 +107,17 @@ fn the_options_write_one_key_each(cx: &mut TestAppContext) {
     assert_eq!(Config::load().chrome, "class");
     press(cx, &rig, "chrome-theme");
     assert_eq!(Config::load().chrome, "theme");
+    // A language chip writes `language` and the window draws in it.
+    press(cx, &rig, "language-de");
+    rig.gui
+        .read_with(cx, |g, _| assert_eq!(g.cfg.language, "de"));
+    assert_eq!(Config::load().language, "de");
+    assert_eq!(
+        wowdps_gui_logic::i18n::current(),
+        wowdps_gui_logic::i18n::Lang::De
+    );
+    press(cx, &rig, "language-en");
+    assert_eq!(Config::load().language, "en");
     // A theme chip writes `theme` and repaints the window in it, the
     // chrome its own accent; pressing it again changes nothing.
     press(cx, &rig, "theme-onyx");

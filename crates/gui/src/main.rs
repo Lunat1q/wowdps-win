@@ -78,7 +78,8 @@ pull rail and the ribbon respond to the mouse.
 Configuration lives in ~/.config/wowdps/config.toml (zoom for both; edge,
 offset, panel size, monitor, follow_game, game_match for the overlay;
 theme = \"onyx\" (the default), \"navy\" or \"frost\" (also chosen in the window's options),
-chrome = \"theme\" or \"class\", density, home_on_start for the window) and
+chrome = \"theme\" or \"class\", density, home_on_start for the window;
+language = \"en\", \"ru\", \"es\" or \"de\" for both, also chosen in the options) and
 is updated when you drag the tab or zoom. [themes.<name>] tables override a
 theme's colours, faces, sizes, corners and effects, or define a theme of
 your own (`base = \"onyx\"` to start from one); --print-theme shows them all.";
@@ -118,6 +119,7 @@ fn main() -> ExitCode {
         );
     }
     let def = themes.named(&cfg.theme).clone();
+    wowdps_gui_logic::i18n::set(wowdps_gui_logic::i18n::Lang::from_key(&cfg.language));
     // The overlay's output, chosen before the app starts: under Hyprland it
     // may wait for the game window to map, a wait no frame should take.
     let output = overlay.then(|| overlay::choose_output(&cfg)).flatten();

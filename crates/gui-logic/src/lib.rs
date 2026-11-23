@@ -23,6 +23,7 @@ pub mod graph;
 pub mod history;
 pub mod home;
 pub mod hypr;
+pub mod i18n;
 pub mod icons;
 pub mod inspect;
 pub mod keys;

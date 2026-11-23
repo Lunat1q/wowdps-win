@@ -169,6 +169,20 @@ impl Gui {
         cx.notify();
     }
 
+    /// The language every line is drawn in: written to the config alone (the
+    /// overlay, which watches the file, follows).
+    pub(crate) fn set_language(
+        &mut self,
+        lang: wowdps_gui_logic::i18n::Lang,
+        cx: &mut Context<Self>,
+    ) {
+        wowdps_gui_logic::i18n::set(lang);
+        let key = lang.key().to_string();
+        self.cfg.language = key.clone();
+        wowdps_gui_logic::config::Config::store(|c| c.language = key);
+        cx.notify();
+    }
+
     /// The chrome: the theme's own accent, or the owner's class when the
     /// window knows it — the character played last, else the class the
     /// config remembers of them.

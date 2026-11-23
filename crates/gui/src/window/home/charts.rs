@@ -140,7 +140,9 @@ fn targets(
                 .size(w.z(2.0 * HIT))
                 .rounded_full()
                 .cursor_pointer()
-                .tooltip(move |window, cx| Tooltip::new(tip.clone()).build(window, cx))
+                .tooltip(move |window, cx| {
+                    Tooltip::new(crate::theme::tr(tip.clone())).build(window, cx)
+                })
                 .on_mouse_down(
                     MouseButton::Left,
                     cx.listener(move |this, _, _, cx| {

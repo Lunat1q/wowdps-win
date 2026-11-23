@@ -403,6 +403,8 @@ fn words_width(
     if s.is_empty() {
         return 0.0;
     }
+    // Measured as `W::text` draws it: in the GUI's language.
+    let s = crate::theme::tr(s.to_string());
     let run = gpui_kit::TextRun {
         len: s.len(),
         font: gpui_kit::Font {
@@ -414,10 +416,7 @@ fn words_width(
         underline: None,
         strikethrough: None,
     };
-    let shaped =
-        window
-            .text_system()
-            .shape_line(SharedString::from(s.to_string()), w.z(size), &[run], None);
+    let shaped = window.text_system().shape_line(s, w.z(size), &[run], None);
     holding(w.zoom, f32::from(shaped.width).ceil())
 }
 

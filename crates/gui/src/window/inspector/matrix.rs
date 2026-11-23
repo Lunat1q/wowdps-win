@@ -116,7 +116,7 @@ pub fn matrix(
                             .rounded(w.r(WASH_RADIUS))
                             .when(delight, |d| d.bg(hsla(color.alpha(WASH_ALPHA))))
                             .tooltip(move |window, cx| {
-                                Tooltip::new(words.clone()).build(window, cx)
+                                Tooltip::new(crate::theme::tr(words.clone())).build(window, cx)
                             })
                             .into_any_element()
                     }

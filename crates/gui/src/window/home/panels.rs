@@ -289,7 +289,7 @@ fn wrapping(w: &W, words: impl Into<SharedString>, size: f32, color: Hsla) -> Di
         .font_family(w.ui.clone())
         .text_size(w.z(size))
         .text_color(color)
-        .child(words.into())
+        .child(crate::theme::tr(words))
 }
 
 /// A character's ink: their class's colour, or the third ink for one whose
@@ -767,7 +767,9 @@ fn key_row(
                 .id(("key-who", i))
                 .flex_none()
                 .child(super::super::paint::dot(w.z(KEY_DOT), char_ink(&k.who, w)))
-                .tooltip(move |window, cx| Tooltip::new(whose.clone()).build(window, cx)),
+                .tooltip(move |window, cx| {
+                    Tooltip::new(crate::theme::tr(whose.clone())).build(window, cx)
+                }),
         )
         .child(
             div()
@@ -902,7 +904,7 @@ fn pull_dot(d: &PullDot, i: usize, names: Names, w: &W, cx: &mut Context<Gui>) -
         .border_color(edge)
         .bg(fill)
         .cursor_pointer()
-        .tooltip(move |window, cx| Tooltip::new(words.clone()).build(window, cx))
+        .tooltip(move |window, cx| Tooltip::new(crate::theme::tr(words.clone())).build(window, cx))
         .on_mouse_down(
             MouseButton::Left,
             cx.listener(move |this, _, _, cx| {

@@ -1,8 +1,8 @@
 //! The ⚙ card (the iced window's `view::options_panel`): durable
-//! presentation toggles — row ranks, realm names — and the chrome's colour,
-//! each written to the config the moment it changes, its one key alone
-//! (`Config::store`), so a zoom or an overlay drag saved since launch is
-//! never written back over. Hung under the bar's gear; it takes its own
+//! presentation toggles — row ranks, realm names — the language and the
+//! chrome's colour, each written to the config the moment it changes, its
+//! one key alone (`Config::store`), so a zoom or an overlay drag saved
+//! since launch is never written back over. Hung under the bar's gear; it takes its own
 //! presses, and the pointer leaving it closes it.
 
 use gpui_kit::prelude::*;
@@ -11,6 +11,7 @@ use gpui_kit::{
     Window, div,
 };
 use wowdps_gui_logic::glyph::Glyph;
+use wowdps_gui_logic::i18n::{self, Lang};
 use wowdps_gui_logic::theme::{Chrome, Def, NAVY, accent_wash};
 
 use super::super::Gui;
@@ -105,6 +106,20 @@ pub fn view(gui: &Gui, w: &W, window: &mut Window, cx: &mut Context<Gui>) -> Any
         .child(w.text("Theme", w.size.label, w.c(|t| t.label_ink), REGULAR))
         .child(themes_row)
         .children(problem)
+        .child(w.text("Language", w.size.label, w.c(|t| t.label_ink), REGULAR))
+        .child(
+            div()
+                .flex()
+                .flex_wrap()
+                .max_w(w.z(w.pitch.menu_w))
+                .gap(w.z(CHIP_GAP))
+                .children(
+                    Lang::ALL
+                        .into_iter()
+                        .map(|l| language_chip(l, l == i18n::current(), w, cx))
+                        .collect::<Vec<_>>(),
+                ),
+        )
         .child(w.text("Chrome", w.size.label, w.c(|t| t.label_ink), REGULAR))
         .child(
             div()
@@ -219,6 +234,43 @@ fn chrome_chip(
         .on_mouse_down(
             MouseButton::Left,
             cx.listener(move |this, _, _, cx| this.set_chrome(chrome, cx)),
+        )
+}
+
+/// One language's chip, pressed as the chrome chips are, its name in
+/// itself (the sinks leave a name no entry has as it is).
+fn language_chip(
+    lang: Lang,
+    on: bool,
+    w: &W,
+    cx: &mut Context<Gui>,
+) -> gpui_kit::base::ObservedElement<Stateful<Div>> {
+    div()
+        .id(ElementId::Name(SharedString::from(format!(
+            "language-{}",
+            lang.key()
+        ))))
+        .test_support()
+        .aria_selected(on)
+        .flex_none()
+        .py(w.z(CHIP_PAD.0 - BORDER))
+        .px(w.z(CHIP_PAD.1 - BORDER))
+        .rounded(w.pill(CHIP_RADIUS))
+        .border(w.z(1.))
+        .cursor_pointer()
+        .when(on, |d| {
+            d.bg(hsla(accent_wash(w.accent))).border_color(w.accent())
+        })
+        .when(!on, |d| d.border_color(w.c(|t| t.line)))
+        .child(w.text(
+            lang.native(),
+            w.size.micro,
+            if on { w.c(|t| t.ink) } else { w.c(|t| t.ink_2) },
+            REGULAR,
+        ))
+        .on_mouse_down(
+            MouseButton::Left,
+            cx.listener(move |this, _, _, cx| this.set_language(lang, cx)),
         )
 }
 

@@ -681,7 +681,7 @@ fn who_dot(who: &Who, id: impl Into<gpui_kit::ElementId>, w: &W, names: Names) -
         .id(id.into())
         .flex_none()
         .child(dot(w.z(DOT), hsla(who.color)))
-        .tooltip(move |window, cx| Tooltip::new(name.clone()).build(window, cx))
+        .tooltip(move |window, cx| Tooltip::new(crate::theme::tr(name.clone())).build(window, cx))
         .into_any_element()
 }
 
@@ -803,7 +803,9 @@ fn pull_line(
                     .flex()
                     .items_center()
                     .child(w.text(PIN, PIN_PX, w.c(|t| t.ink_3), REGULAR))
-                    .tooltip(|window, cx| Tooltip::new(PIN_TIP).build(window, cx)),
+                    .tooltip(|window, cx| {
+                        Tooltip::new(crate::theme::tr(PIN_TIP)).build(window, cx)
+                    }),
             )
         })
         .on_mouse_down(

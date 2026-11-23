@@ -114,6 +114,9 @@ pub struct Config {
     pub density: String,
     /// Open Home at launch when nothing is live.
     pub home_on_start: bool,
+    /// The GUI's language (`en`, `ru`, `es`, `de`; `i18n::Lang`): a plain
+    /// string, so an unknown one reads as English.
+    pub language: String,
     /// `[editions.<key>]`: the window's keys of each edition but Retail
     /// (`forever`; [`edition_key`]) — the character Home opens on, its
     /// class and the dates Home counts from, as the top-level
@@ -169,6 +172,7 @@ impl Default for Config {
             themes: None,
             density: crate::theme::Density::default().name().to_string(),
             home_on_start: true,
+            language: "en".to_string(),
             editions: BTreeMap::new(),
             extra: toml::Table::new(),
             load_failed: false,
@@ -669,6 +673,7 @@ mod tests {
             )),
             density: "compact".to_string(),
             home_on_start: false,
+            language: "de".to_string(),
             editions: BTreeMap::from([(
                 "forever".to_string(),
                 EditionKeys {

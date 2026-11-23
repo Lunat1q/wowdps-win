@@ -75,7 +75,7 @@ pub fn icon_button(
 /// `words` under the pointer (`.tip`), Kit's tooltip in the theme's
 /// floating surface.
 pub fn tip<E: StatefulInteractiveElement>(el: E, words: impl Into<SharedString>) -> E {
-    let words: SharedString = words.into();
+    let words = crate::theme::tr(words);
     el.tooltip(move |window, cx| Tooltip::new(words.clone()).build(window, cx))
 }
 

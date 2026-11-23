@@ -247,6 +247,12 @@ impl Overlay {
         self.cfg.theme = disk.theme;
         self.cfg.themes = disk.themes;
         self.cfg.chrome = disk.chrome;
+        // The window's language choice, followed as its theme is.
+        let lang = wowdps_gui_logic::i18n::Lang::from_key(&disk.language);
+        if lang != wowdps_gui_logic::i18n::current() {
+            wowdps_gui_logic::i18n::set(lang);
+            cx.notify();
+        }
         if *look.def == def && look.accent == wanted {
             return;
         }

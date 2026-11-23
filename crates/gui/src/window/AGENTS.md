@@ -63,6 +63,11 @@ are the `navy` theme (`crates/gui-logic/src/theme/navy.rs`).
   exactly. Bars sit under the row's text; no text sits on a class color.
 - **Class chrome wears the owner's class** (`Gui::learn_class`), never the
   selection's, which would recolor the window on every re-sort.
+- **Languages.** Words are written in English and drawn in the configured
+  language: the text sinks (`W::text`, `W::words`, `Ov::words`, `tip`, the
+  talent pane, the measures beside them) pass every line through
+  `theme::tr`. A new line someone reads gets its entry in gui-logic's
+  `i18n::WORDS`; a figure or a name in it is a `{}` there.
 - **Words** come from gui-logic's `labels`: sentence case, the prototype's
   view names (`labels::WINDOW_VIEWS`). A player's name is written through
   `labels::Names` (`Gui::names` for the stage, `Gui::window_names` for Home,

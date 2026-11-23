@@ -174,7 +174,7 @@ impl Ov {
             .text_size(self.z(size))
             .text_color(color)
             .whitespace_nowrap()
-            .child(text.into())
+            .child(crate::theme::tr(text))
     }
 
     /// Numbers in the overlay's monospace face, `size` ×z.
